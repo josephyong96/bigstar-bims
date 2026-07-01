@@ -1,165 +1,122 @@
-import axios, { AxiosError } from 'axios'
-import { useAuthStore } from '../stores/authStore'
+import axios from "axios";
+import { useAuthStore } from "../stores/authStore";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export const api = axios.create({
   baseURL: `${API_BASE_URL}/api/v1`,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
-})
+});
 
-// Request interceptor - add auth token
 api.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().accessToken
+  const token = useAuthStore.getState().token;
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+    config.headers.Authorization = `Bearer ${token}`;
   }
-  return config
-})
+  return config;
+});
 
-// Response interceptor - handle token refresh
 api.interceptors.response.use(
   (response) => response,
-  async (error: AxiosError) => {
-    const originalRequest = error.config
-    if (!originalRequest) return Promise.reject(error)
-
+  (error) => {
     if (error.response?.status === 401) {
-      const refreshToken = useAuthStore.getState().refreshToken
-      if (refreshToken) {
-        try {
-          const response = await axios.post(`${API_BASE_URL}/api/v1/auth/refresh`, {
-            refresh_token: refreshToken,
-          })
-          const { access_token } = response.data
-          useAuthStore.getState().setTokens(access_token, refreshToken)
-          originalRequest.headers.Authorization = `Bearer ${access_token}`
-          return api(originalRequest)
-        } catch {
-          useAuthStore.getState().logout()
-          window.location.href = '/login'
-        }
-      } else {
-        useAuthStore.getState().logout()
-        window.location.href = '/login'
-      }
+      useAuthStore.getState().logout();
+      window.location.href = "/login";
     }
-    return Promise.reject(error)
+    return Promise.reject(error);
   }
-)
+);
 
-// Items API
-export const itemsApi = {
-  list: (params?: Record<string, unknown>) => api.get('/items', { params }),
-  get: (id: string) => api.get(`/items/${id}`),
-  create: (data: unknown) => api.post('/items', data),
-  update: (id: string, data: unknown) => api.put(`/items/${id}`, data),
-  delete: (id: string) => api.delete(`/items/${id}`),
-  getStockSummary: (id: string) => api.get(`/items/${id}/stock-summary`),
-}
+// Auth
+export const login = (username: string, password: string) =>
+  api.post("/auth/login", { username, password });
 
-// Stock API
-export const stockApi = {
-  list: (params?: Record<string, unknown>) => api.get('/stock', { params }),
-  stockIn: (data: unknown) => api.post('/stock/in', data),
-  stockOut: (data: unknown) => api.post('/stock/out', data),
-  transfer: (data: unknown) => api.post('/stock/transfer', data),
-  movements: (params?: Record<string, unknown>) => api.get('/stock/movements', { params }),
-  adjust: (data: unknown) => api.post('/stock/adjust', data),
-}
+export const getMe = () => api.get("/auth/me");
 
-// Purchase Orders API
-export const poApi = {
-  list: (params?: Record<string, unknown>) => api.get('/purchase-orders', { params }),
-  get: (id: string) => api.get(`/purchase-orders/${id}`),
-  create: (data: unknown) => api.post('/purchase-orders', data),
-  update: (id: string, data: unknown) => api.put(`/purchase-orders/${id}`, data),
-  receive: (id: string, data: unknown) => api.post(`/purchase-orders/${id}/receive`, data),
-  getPdf: (id: string) => api.get(`/purchase-orders/${id}/pdf`, { responseType: 'blob' }),
-}
+// Items
+export const getItems = (params?: Record<string, unknown>) =>
+  api.get("/items", { params });
+export const getItem = (id: number) => api.get(`/items/${id}`);
+export const createItem = (data: unknown) => api.post("/items", data);
+export const updateItem = (id: number, data: unknown) =>
+  api.put(`/items/${id}`, data);
+export const deleteItem = (id: number) => api.delete(`/items/${id}`);
 
-// Delivery Orders API
-export const doApi = {
-  list: (params?: Record<string, unknown>) => api.get('/delivery-orders', { params }),
-  get: (id: string) => api.get(`/delivery-orders/${id}`),
-  create: (data: unknown) => api.post('/delivery-orders', data),
-  update: (id: string, data: unknown) => api.put(`/delivery-orders/${id}`, data),
-  updateStatus: (id: string, data: unknown) => api.patch(`/delivery-orders/${id}/status`, data),
-}
+// Projects
+export const getProjects = (params?: Record<string, unknown>) =>
+  api.get("/projects", { params });
+export const getProject = (id: number) => api.get(`/projects/${id}`);
+export const createProject = (data: unknown) => api.post("/projects", data);
+export const updateProject = (id: number, data: unknown) =>
+  api.put(`/projects/${id}`, data);
+export const deleteProject = (id: number) => api.delete(`/projects/${id}`);
 
-// Repair Tickets API
-export const repairApi = {
-  list: (params?: Record<string, unknown>) => api.get('/repair-tickets', { params }),
-  get: (id: string) => api.get(`/repair-tickets/${id}`),
-  create: (data: unknown) => api.post('/repair-tickets', data),
-  update: (id: string, data: unknown) => api.put(`/repair-tickets/${id}`, data),
-  updateStatus: (id: string, data: unknown) => api.patch(`/repair-tickets/${id}/status`, data),
-  assign: (id: string, data: unknown) => api.patch(`/repair-tickets/${id}/assign`, data),
-}
+// Purchase Orders
+export const getPurchaseOrders = (params?: Record<string, unknown>) =>
+  api.get("/purchase-orders", { params });
+export const getPurchaseOrder = (id: number) => api.get(`/purchase-orders/${id}`);
+export const createPurchaseOrder = (data: unknown) =>
+  api.post("/purchase-orders", data);
+export const updatePurchaseOrder = (id: number, data: unknown) =>
+  api.put(`/purchase-orders/${id}`, data);
+export const deletePurchaseOrder = (id: number) =>
+  api.delete(`/purchase-orders/${id}`);
 
-// Projects API
-export const projectApi = {
-  list: (params?: Record<string, unknown>) => api.get('/projects', { params }),
-  get: (id: string) => api.get(`/projects/${id}`),
-  create: (data: unknown) => api.post('/projects', data),
-  update: (id: string, data: unknown) => api.put(`/projects/${id}`, data),
-  delete: (id: string) => api.delete(`/projects/${id}`),
-  getStock: (id: string) => api.get(`/projects/${id}/stock`),
-}
+// Delivery Orders
+export const getDeliveryOrders = (params?: Record<string, unknown>) =>
+  api.get("/delivery-orders", { params });
+export const getDeliveryOrder = (id: number) => api.get(`/delivery-orders/${id}`);
+export const createDeliveryOrder = (data: unknown) =>
+  api.post("/delivery-orders", data);
+export const updateDeliveryOrder = (id: number, data: unknown) =>
+  api.put(`/delivery-orders/${id}`, data);
+export const deleteDeliveryOrder = (id: number) =>
+  api.delete(`/delivery-orders/${id}`);
 
-// Serial Numbers API
-export const serialApi = {
-  list: (params?: Record<string, unknown>) => api.get('/serials', { params }),
-  get: (id: string) => api.get(`/serials/${id}`),
-  create: (data: unknown[]) => api.post('/serials', data),
-  update: (id: string, data: unknown) => api.put(`/serials/${id}`, data),
-  bulkUpdate: (data: unknown) => api.post('/serials/bulk-update', data),
-}
+// Repairs
+export const getRepairs = (params?: Record<string, unknown>) =>
+  api.get("/repairs", { params });
+export const getRepair = (id: number) => api.get(`/repairs/${id}`);
+export const createRepair = (data: unknown) => api.post("/repairs", data);
+export const updateRepair = (id: number, data: unknown) =>
+  api.put(`/repairs/${id}`, data);
+export const deleteRepair = (id: number) => api.delete(`/repairs/${id}`);
 
-// Batch Numbers API
-export const batchApi = {
-  list: (params?: Record<string, unknown>) => api.get('/batches', { params }),
-  get: (id: string) => api.get(`/batches/${id}`),
-  create: (data: unknown) => api.post('/batches', data),
-  update: (id: string, data: unknown) => api.put(`/batches/${id}`, data),
-  delete: (id: string) => api.delete(`/batches/${id}`),
-}
+// Stock Movements
+export const getStockMovements = (params?: Record<string, unknown>) =>
+  api.get("/stock-movements", { params });
+export const createStockMovement = (data: unknown) =>
+  api.post("/stock-movements", data);
 
-// Locations API
-export const locationApi = {
-  list: (params?: Record<string, unknown>) => api.get('/locations', { params }),
-  get: (id: string) => api.get(`/locations/${id}`),
-  create: (data: unknown) => api.post('/locations', data),
-  update: (id: string, data: unknown) => api.put(`/locations/${id}`, data),
-  delete: (id: string) => api.delete(`/locations/${id}`),
-}
+// Batch Numbers
+export const getBatchNumbers = (params?: Record<string, unknown>) =>
+  api.get("/batch-numbers", { params });
+export const getBatchNumber = (id: number) => api.get(`/batch-numbers/${id}`);
 
-// Users API
-export const usersApi = {
-  list: (params?: Record<string, unknown>) => api.get('/users', { params }),
-  get: (id: string) => api.get(`/users/${id}`),
-  create: (data: unknown) => api.post('/users', data),
-  update: (id: string, data: unknown) => api.put(`/users/${id}`, data),
-  delete: (id: string) => api.delete(`/users/${id}`),
-}
+// Serial Numbers
+export const getSerialNumbers = (params?: Record<string, unknown>) =>
+  api.get("/serial-numbers", { params });
+export const getSerialNumber = (id: number) => api.get(`/serial-numbers/${id}`);
 
-// Reports API
-export const reportsApi = {
-  dashboard: () => api.get('/reports/dashboard'),
-  inventorySummary: (params?: Record<string, unknown>) => api.get('/reports/inventory-summary', { params }),
-  stockMovements: (params?: Record<string, unknown>) => api.get('/reports/stock-movements', { params }),
-  poSummary: () => api.get('/reports/purchase-order-summary'),
-  repairSummary: () => api.get('/reports/repair-summary'),
-  lowStock: () => api.get('/reports/low-stock'),
-}
+// Locations
+export const getLocations = (params?: Record<string, unknown>) =>
+  api.get("/locations", { params });
+export const createLocation = (data: unknown) => api.post("/locations", data);
+export const updateLocation = (id: number, data: unknown) =>
+  api.put(`/locations/${id}`, data);
+export const deleteLocation = (id: number) => api.delete(`/locations/${id}`);
 
-// Auth API
-export const authApi = {
-  login: (username: string, password: string) =>
-    api.post('/auth/login', { username, password }),
-  refresh: (refreshToken: string) =>
-    api.post('/auth/refresh', { refresh_token: refreshToken }),
-  me: () => api.get('/auth/me'),
-}
+// Users
+export const getUsers = (params?: Record<string, unknown>) =>
+  api.get("/users", { params });
+export const createUser = (data: unknown) => api.post("/users", data);
+export const updateUser = (id: number, data: unknown) =>
+  api.put(`/users/${id}`, data);
+export const deleteUser = (id: number) => api.delete(`/users/${id}`);
+
+// Dashboard
+export const getDashboardStats = () => api.get("/dashboard/stats");
+export const getDashboardActivities = () => api.get("/dashboard/activities");
+export const getDashboardAlerts = () => api.get("/dashboard/alerts");
