@@ -6,6 +6,7 @@ RUN pip install --no-cache-dir fastapi uvicorn sqlalchemy python-multipart pydan
 
 COPY app/ /app/app/
 COPY frontend/ /app/frontend/
+RUN mkdir -p /app/frontend/assets
 
 RUN mkdir -p /data
 
