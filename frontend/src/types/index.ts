@@ -1,169 +1,182 @@
-export interface Item {
-  id: string
-  sku: string
-  name: string
-  description: string | null
-  category_id: string | null
-  brand: string | null
-  model: string | null
-  unit: string
-  unit_cost: number | null
-  reorder_level: number
-  inventory_type: 'serialized' | 'batch_tracked' | 'standard'
-  barcode: string | null
-  status: 'active' | 'inactive'
-  total_quantity: number
-  created_at: string
-  updated_at: string | null
-}
-
-export interface Category {
-  id: string
-  code: string
-  name: string
-  description: string | null
+export interface User {
+  id: number;
+  username: string;
+  full_name: string;
+  email: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
 }
 
 export interface Location {
-  id: string
-  code: string
-  name: string
-  type: 'warehouse' | 'office' | 'project_site' | 'supplier' | 'virtual'
-  address: string | null
-  status: 'active' | 'inactive'
+  id: number;
+  name: string;
+  address: string;
+  type: string;
+  is_active: boolean;
+  created_at: string;
 }
 
 export interface Project {
-  id: string
-  project_code: string
-  name: string
-  description: string | null
-  client_name: string | null
-  start_date: string | null
-  end_date: string | null
-  status: 'active' | 'completed' | 'on_hold' | 'cancelled'
-  created_by: string | null
-  created_at: string
+  id: number;
+  project_code: string;
+  name: string;
+  description: string;
+  location_id: number;
+  location?: Location;
+  status: string;
+  start_date: string;
+  end_date: string;
+  created_by: number;
+  created_at: string;
 }
 
-export interface Stock {
-  id: string
-  item_id: string
-  location_id: string
-  project_id: string | null
-  quantity: number
-  reserved_quantity: number
-  unit_cost: number | null
-  item_name?: string
-  item_sku?: string
-  location_name?: string
-  location_code?: string
-  project_code?: string
+export interface ItemCategory {
+  id: number;
+  name: string;
+  description: string;
+  created_at: string;
 }
 
-export interface StockMovement {
-  id: string
-  movement_type: 'stock_in' | 'stock_out' | 'transfer' | 'adjustment'
-  item_id: string
-  from_location_id: string | null
-  to_location_id: string | null
-  quantity: number
-  reference_no: string | null
-  reference_type: string | null
-  notes: string | null
-  created_by: string | null
-  created_at: string
-}
-
-export interface PurchaseOrder {
-  id: string
-  po_number: string
-  supplier_name: string
-  status: 'pending' | 'partial' | 'received' | 'cancelled'
-  total_amount: number
-  notes: string | null
-  created_by: string | null
-  created_at: string
-  po_items: POItem[]
-}
-
-export interface POItem {
-  id: string
-  po_id: string
-  item_id: string
-  quantity: number
-  unit_price: number
-  received_qty: number
-  item_name?: string
-  item_sku?: string
-}
-
-export interface DeliveryOrder {
-  id: string
-  do_number: string
-  project_id: string
-  status: 'pending' | 'dispatched' | 'in_transit' | 'delivered' | 'cancelled' | 'returned'
-  priority: 'low' | 'medium' | 'high' | 'urgent'
-  delivery_date: string | null
-  notes: string | null
-  created_by: string | null
-  created_at: string
-}
-
-export interface RepairTicket {
-  id: string
-  ticket_number: string
-  item_id: string
-  serial_id: string | null
-  issue_description: string
-  status: 'open' | 'in_progress' | 'on_hold' | 'resolved' | 'closed' | 'cancelled'
-  priority: 'low' | 'medium' | 'high' | 'urgent'
-  reported_by: string
-  assigned_to: string | null
-  resolution_notes: string | null
-  created_at: string
-  resolved_at: string | null
-}
-
-export interface SerialNumber {
-  id: string
-  serial_number: string
-  item_id: string
-  status: 'in_stock' | 'allocated' | 'in_use' | 'under_repair' | 'disposed' | 'reserved'
-  location_id: string | null
-  project_id: string | null
-  po_id: string | null
-  created_at: string
+export interface Item {
+  id: number;
+  item_code: string;
+  name: string;
+  description: string;
+  category_id: number;
+  category?: ItemCategory;
+  unit: string;
+  barcode: string;
+  min_stock_level: number;
+  current_stock: number;
+  status: string;
+  created_at: string;
 }
 
 export interface BatchNumber {
-  id: string
-  item_id: string
-  batch_number: string
-  location_id: string | null
-  quantity: number
-  expiry_date: string | null
-  manufacture_date: string | null
-  supplier_batch: string | null
-  status: 'active' | 'inactive' | 'expired'
+  id: number;
+  batch_code: string;
+  item_id: number;
+  item?: Item;
+  purchase_order_id: number;
+  quantity: number;
+  unit_cost: number;
+  manufacture_date: string;
+  expiry_date: string;
+  status: string;
+  created_at: string;
 }
 
-export interface User {
-  id: string
-  username: string
-  email: string
-  full_name: string | null
-  role: string
-  is_active: boolean
-  last_login: string | null
-  created_at: string
+export interface SerialNumber {
+  id: number;
+  serial_code: string;
+  batch_id: number;
+  batch?: BatchNumber;
+  item_id: number;
+  item?: Item;
+  status: string;
+  current_location_id: number;
+  current_location?: Location;
+  created_at: string;
 }
 
-export interface DashboardSummary {
-  total_items: number
-  total_stock: number
-  low_stock_count: number
-  pending_purchase_orders: number
-  open_repair_tickets: number
-  active_projects: number
+export interface PurchaseOrder {
+  id: number;
+  po_code: string;
+  project_id: number;
+  project?: Project;
+  supplier_name: string;
+  status: string;
+  total_amount: number;
+  order_date: string;
+  expected_date: string;
+  created_by: number;
+  created_at: string;
+  items?: POItem[];
+}
+
+export interface POItem {
+  id: number;
+  purchase_order_id: number;
+  item_id: number;
+  item?: Item;
+  quantity: number;
+  unit_cost: number;
+  total_cost: number;
+}
+
+export interface DeliveryOrder {
+  id: number;
+  do_code: string;
+  project_id: number;
+  project?: Project;
+  receiver_name: string;
+  status: string;
+  delivery_date: string;
+  created_by: number;
+  created_at: string;
+  items?: DOItem[];
+}
+
+export interface DOItem {
+  id: number;
+  delivery_order_id: number;
+  item_id: number;
+  item?: Item;
+  serial_number_id: number;
+  serial_number?: SerialNumber;
+  quantity: number;
+}
+
+export interface RepairRecord {
+  id: number;
+  repair_code: string;
+  serial_number_id: number;
+  serial_number?: SerialNumber;
+  item_id: number;
+  item?: Item;
+  issue_description: string;
+  repair_status: string;
+  repair_cost: number;
+  repaired_by: string;
+  created_at: string;
+  completed_at: string;
+}
+
+export interface StockMovement {
+  id: number;
+  movement_type: string;
+  item_id: number;
+  item?: Item;
+  serial_number_id: number;
+  serial_number?: SerialNumber;
+  from_location_id: number;
+  from_location?: Location;
+  to_location_id: number;
+  to_location?: Location;
+  quantity: number;
+  reference_id: number;
+  reference_type: string;
+  notes: string;
+  created_by: number;
+  created_at: string;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+export interface LoginCredentials {
+  username: string;
+  password: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
 }
