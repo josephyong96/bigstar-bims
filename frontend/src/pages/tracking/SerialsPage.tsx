@@ -23,7 +23,7 @@ export default function SerialsPage() {
       const res = await serialApi.list({ search, status: status || undefined });
       setSerials(res.data.items || []);
     } catch (e) { console.error(e); }
-    setLoading(false();
+    setLoading(false);
   }
 
   return (
