@@ -1,117 +1,59 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { api } from "@/services/api";
+import { Select } from "@/components/ui/select";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
-import { Plus } from "lucide-react";
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import { locationApi } from "@/services/api";
+import type { Location } from "@/types";
+import { Search } from "lucide-react";
 
 export default function LocationsPage() {
-  const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", description: "" });
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
-  const { data: locations, isLoading } = useQuery({
-    queryKey: ["locations"],
-    queryFn: () => api.get("/locations"),
-  });
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await locationApi.list();
+        setLocations(res.data || []);
+      } catch (e) { console.error(e); }
+      setLoading(false);
+    }
+    load();
+  }, []);
 
-  const createMutation = useMutation({
-    mutationFn: (data: any) => api.post("/locations", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["locations"] });
-      setOpen(false);
-      setForm({ name: "", description: "" });
-    },
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    createMutation.mutate(form);
-  };
-
-  if (isLoading) return <LoadingSpinner />;
+  const filtered = locations.filter((l) =>
+    !search || l.name.toLowerCase().includes(search.toLowerCase()) || l.code.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Locations</h1>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Location
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create Location</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Name</Label>
-                <Input
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Description</Label>
-                <Input
-                  value={form.description}
-                  onChange={(e) =>
-                    setForm({ ...form, description: e.target.value })
-                  }
-                  placeholder="Optional"
-                />
-              </div>
-              <Button
-                type="submit"
-                disabled={createMutation.isPending}
-                className="w-full"
-              >
-                {createMutation.isPending ? "Creating..." : "Create Location"}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Description</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {locations?.map((loc: any) => (
-              <TableRow key={loc.id}>
-                <TableCell className="font-medium">{loc.name}</TableCell>
-                <TableCell>{loc.description || "-"}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <h2 className="text-2xl font-bold text-gray-800">Locations</h2>
+      <Card><CardContent className="p-4">
+        <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} /><Input placeholder="Search locations..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" /></div>
+      </CardContent></Card>
+      <Card><CardContent className="p-0">
+        {loading ? <LoadingSpinner className="flex justify-center p-8" /> : (
+          <Table>
+            <TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Name</TableHead><TableHead>Type</TableHead><TableHead>Contact</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {filtered.length === 0 && <TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-500">No locations found</TableCell></TableRow>}
+              {filtered.map((l) => (
+                <TableRow key={l.id}>
+                  <TableCell className="font-medium">{l.code}</TableCell>
+                  <TableCell>{l.name}</TableCell>
+                  <TableCell className="capitalize">{l.location_type.replace(/_/g, " ")}</TableCell>
+                  <TableCell>{l.contact_person || "-"}</TableCell>
+                  <TableCell><StatusBadge status={l.is_active ? "active" : "inactive"} /></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent></Card>
     </div>
   );
 }

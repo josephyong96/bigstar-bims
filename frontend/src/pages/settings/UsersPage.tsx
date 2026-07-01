@@ -1,180 +1,66 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { api } from "@/services/api";
+import { Select } from "@/components/ui/select";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
-import { Plus } from "lucide-react";
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import { userApi } from "@/services/api";
+import { Search } from "lucide-react";
+
+const ROLE_LABELS: Record<string, string> = {
+  management: "Management", project_manager: "Project Manager",
+  sales: "Sales", warehouse: "Warehouse", technician: "Technician"
+};
 
 export default function UsersPage() {
-  const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({
-    username: "",
-    email: "",
-    full_name: "",
-    password: "",
-    role: "staff",
-  });
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [role, setRole] = useState("");
 
-  const { data: users, isLoading } = useQuery({
-    queryKey: ["users"],
-    queryFn: () => api.get("/users"),
-  });
+  useEffect(() => { load(); }, [search, role]);
 
-  const createMutation = useMutation({
-    mutationFn: (data: any) => api.post("/users", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-      setOpen(false);
-      setForm({
-        username: "",
-        email: "",
-        full_name: "",
-        password: "",
-        role: "staff",
-      });
-    },
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    createMutation.mutate(form);
-  };
-
-  if (isLoading) return <LoadingSpinner />;
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await userApi.list({ search, role: role || undefined });
+      setUsers(res.data.items || []);
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Users</h1>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add User
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create User</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Username</Label>
-                <Input
-                  value={form.username}
-                  onChange={(e) =>
-                    setForm({ ...form, username: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) =>
-                    setForm({ ...form, email: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Full Name</Label>
-                <Input
-                  value={form.full_name}
-                  onChange={(e) =>
-                    setForm({ ...form, full_name: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Password</Label>
-                <Input
-                  type="password"
-                  value={form.password}
-                  onChange={(e) =>
-                    setForm({ ...form, password: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Role</Label>
-                <Select
-                  value={form.role}
-                  onValueChange={(v) => setForm({ ...form, role: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="manager">Manager</SelectItem>
-                    <SelectItem value="staff">Staff</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button
-                type="submit"
-                disabled={createMutation.isPending}
-                className="w-full"
-              >
-                {createMutation.isPending ? "Creating..." : "Create User"}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Username</TableHead>
-              <TableHead>Full Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Role</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {users?.map((user: any) => (
-              <TableRow key={user.id}>
-                <TableCell className="font-medium">{user.username}</TableCell>
-                <TableCell>{user.full_name}</TableCell>
-                <TableCell>{user.email}</TableCell>
-                <TableCell>{user.role}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <h2 className="text-2xl font-bold text-gray-800">User Management</h2>
+      <Card><CardContent className="p-4 flex gap-3">
+        <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} /><Input placeholder="Search users..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" /></div>
+        <Select value={role} onChange={(e) => setRole(e.target.value)} className="w-44">
+          <option value="">All Roles</option>
+          <option value="management">Management</option><option value="project_manager">Project Manager</option>
+          <option value="sales">Sales</option><option value="warehouse">Warehouse</option><option value="technician">Technician</option>
+        </Select>
+      </CardContent></Card>
+      <Card><CardContent className="p-0">
+        {loading ? <LoadingSpinner className="flex justify-center p-8" /> : (
+          <Table>
+            <TableHeader><TableRow><TableHead>Username</TableHead><TableHead>Full Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {users.length === 0 && <TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-500">No users found</TableCell></TableRow>}
+              {users.map((u) => (
+                <TableRow key={u.id}>
+                  <TableCell className="font-medium">{u.username}</TableCell>
+                  <TableCell>{u.full_name}</TableCell>
+                  <TableCell>{u.email}</TableCell>
+                  <TableCell>{ROLE_LABELS[u.role] || u.role}</TableCell>
+                  <TableCell><StatusBadge status={u.is_active ? "active" : "inactive"} /></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent></Card>
     </div>
   );
 }
