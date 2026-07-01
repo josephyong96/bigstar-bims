@@ -16,16 +16,15 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { Plus, Search } from "lucide-react";
 
-export default function ItemsPage() {
+export default function DeliveryOrdersPage() {
   const [search, setSearch] = useState("");
-  const { data: items, isLoading } = useQuery({
-    queryKey: ["items"],
-    queryFn: () => api.get("/items"),
+  const { data: orders, isLoading } = useQuery({
+    queryKey: ["delivery-orders"],
+    queryFn: () => api.get("/delivery-orders"),
   });
 
-  const filteredItems = items?.filter((item: any) =>
-    item.name?.toLowerCase().includes(search.toLowerCase()) ||
-    item.sku?.toLowerCase().includes(search.toLowerCase())
+  const filtered = orders?.filter((o: any) =>
+    o.do_number?.toLowerCase().includes(search.toLowerCase())
   );
 
   if (isLoading) return <LoadingSpinner />;
@@ -33,11 +32,11 @@ export default function ItemsPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Items</h1>
-        <Link to="/items/new">
+        <h1 className="text-2xl font-bold">Delivery Orders</h1>
+        <Link to="/delivery-orders/new">
           <Button>
             <Plus className="h-4 w-4 mr-2" />
-            New Item
+            New DO
           </Button>
         </Link>
       </div>
@@ -45,7 +44,7 @@ export default function ItemsPage() {
       <div className="flex items-center gap-2">
         <Search className="h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search items..."
+          placeholder="Search DOs..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-sm"
@@ -56,32 +55,26 @@ export default function ItemsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>SKU</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Qty</TableHead>
+              <TableHead>DO Number</TableHead>
+              <TableHead>Customer</TableHead>
+              <TableHead>Date</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredItems?.map((item: any) => (
-              <TableRow key={item.id}>
-                <TableCell className="font-medium">{item.sku}</TableCell>
-                <TableCell>{item.name}</TableCell>
-                <TableCell>{item.category_name || "-"}</TableCell>
-                <TableCell>{item.current_qty}</TableCell>
+            {filtered?.map((order: any) => (
+              <TableRow key={order.id}>
+                <TableCell className="font-medium">{order.do_number}</TableCell>
+                <TableCell>{order.customer_name || "-"}</TableCell>
                 <TableCell>
-                  <StatusBadge
-                    status={
-                      item.current_qty <= item.min_stock_level
-                        ? "low_stock"
-                        : "active"
-                    }
-                  />
+                  {new Date(order.created_at).toLocaleDateString()}
                 </TableCell>
                 <TableCell>
-                  <Link to={`/items/${item.id}`}>
+                  <StatusBadge status={order.status} />
+                </TableCell>
+                <TableCell>
+                  <Link to={`/delivery-orders/${order.id}`}>
                     <Button variant="ghost" size="sm">View</Button>
                   </Link>
                 </TableCell>
