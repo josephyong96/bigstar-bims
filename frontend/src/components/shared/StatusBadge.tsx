@@ -1,44 +1,46 @@
-import { cn } from '../../lib/utils'
+import { badgeVariants } from "../ui/badge";
+import { cn } from "../../lib/utils";
 
-interface StatusBadgeProps {
-  status: string
-  className?: string
-}
+type Status =
+  | "active"
+  | "inactive"
+  | "pending"
+  | "completed"
+  | "cancelled"
+  | "draft"
+  | "approved"
+  | "rejected"
+  | "in_progress"
+  | "done"
+  | "open"
+  | "closed"
+  | "low"
+  | "medium"
+  | "high";
 
-const statusColors: Record<string, string> = {
-  active: 'bg-green-100 text-green-800',
-  inactive: 'bg-gray-100 text-gray-800',
-  pending: 'bg-yellow-100 text-yellow-800',
-  partial: 'bg-orange-100 text-orange-800',
-  received: 'bg-green-100 text-green-800',
-  dispatched: 'bg-blue-100 text-blue-800',
-  in_transit: 'bg-blue-100 text-blue-800',
-  delivered: 'bg-green-100 text-green-800',
-  cancelled: 'bg-red-100 text-red-800',
-  returned: 'bg-purple-100 text-purple-800',
-  open: 'bg-yellow-100 text-yellow-800',
-  in_progress: 'bg-blue-100 text-blue-800',
-  on_hold: 'bg-orange-100 text-orange-800',
-  resolved: 'bg-green-100 text-green-800',
-  closed: 'bg-gray-100 text-gray-800',
-  low: 'bg-green-100 text-green-800',
-  medium: 'bg-yellow-100 text-yellow-800',
-  high: 'bg-orange-100 text-orange-800',
-  urgent: 'bg-red-100 text-red-800',
-}
+const statusColorMap: Record<Status, string> = {
+  active: "bg-green-100 text-green-800 hover:bg-green-100",
+  inactive: "bg-gray-100 text-gray-800 hover:bg-gray-100",
+  pending: "bg-yellow-100 text-yellow-800 hover:bg-yellow-100",
+  completed: "bg-blue-100 text-blue-800 hover:bg-blue-100",
+  cancelled: "bg-red-100 text-red-800 hover:bg-red-100",
+  draft: "bg-gray-100 text-gray-800 hover:bg-gray-100",
+  approved: "bg-green-100 text-green-800 hover:bg-green-100",
+  rejected: "bg-red-100 text-red-800 hover:bg-red-100",
+  in_progress: "bg-purple-100 text-purple-800 hover:bg-purple-100",
+  done: "bg-blue-100 text-blue-800 hover:bg-blue-100",
+  open: "bg-green-100 text-green-800 hover:bg-green-100",
+  closed: "bg-gray-100 text-gray-800 hover:bg-gray-100",
+  low: "bg-green-100 text-green-800 hover:bg-green-100",
+  medium: "bg-yellow-100 text-yellow-800 hover:bg-yellow-100",
+  high: "bg-red-100 text-red-800 hover:bg-red-100",
+};
 
-export function StatusBadge({ status, className = '' }: StatusBadgeProps) {
-  const colorClass = statusColors[status] || 'bg-gray-100 text-gray-800'
-
+export function StatusBadge({ status }: { status: string }) {
+  const colorClass = statusColorMap[status as Status] || statusColorMap.draft;
   return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize',
-        colorClass,
-        className
-      )}
-    >
-      {status.replace(/_/g, ' ')}
+    <span className={cn(badgeVariants({ variant: "default" }), colorClass)}>
+      {status.replace(/_/g, " ").toUpperCase()}
     </span>
-  )
+  );
 }
