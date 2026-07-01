@@ -1,13 +1,1135 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>BIMS — Big Star Builders Inventory</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bigstar BIMS - Inventory Management</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        primary: '#1e40af',
+        secondary: '#3b82f6',
+        accent: '#f59e0b',
+        danger: '#dc2626',
+        success: '#16a34a',
+        warning: '#d97706'
+      }
+    }
+  }
+}
+</script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+body { font-family: 'Inter', sans-serif; background: #f3f4f6; }
+.sidebar { transition: transform 0.3s; }
+.sidebar-hidden { transform: translateX(-100%); }
+.table-row:hover { background: #eff6ff; }
+.modal { display: none; }
+.modal.active { display: flex; }
+.page { display: none; }
+.page.active { display: block; }
+.toast { animation: slideIn 0.3s ease-out, fadeOut 0.3s ease-in 2.7s forwards; }
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes fadeOut { to { opacity: 0; transform: translateX(100%); } }
+</style>
+</head>
+<body class="min-h-screen">
+
+<div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+<div id="loginPage" class="page active min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-blue-800 to-blue-600">
+  <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md mx-4">
+    <div class="text-center mb-8">
+      <div class="w-16 h-16 bg-primary rounded-xl flex items-center justify-center mx-auto mb-4">
+        <i class="fas fa-boxes text-white text-2xl"></i>
+      </div>
+      <h1 class="text-2xl font-bold text-gray-800">Bigstar BIMS</h1>
+      <p class="text-gray-500 text-sm mt-1">Inventory Management System</p>
+    </div>
+    <form id="loginForm" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+        <input type="text" id="loginUser" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none" placeholder="Enter username" required>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+        <input type="password" id="loginPass" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none" placeholder="Enter password" required>
+      </div>
+      <button type="submit" class="w-full bg-primary text-white py-2.5 rounded-lg font-medium hover:bg-blue-800 transition flex items-center justify-center gap-2">
+        <i class="fas fa-sign-in-alt"></i> Sign In
+      </button>
+    </form>
+    <div class="mt-4 p-3 bg-blue-50 rounded-lg text-xs text-blue-700">
+      <p><strong>Default accounts:</strong></p>
+      <p>admin / admin123 (Management)</p>
+      <p>warehouse / admin123</p>
+      <p>sales / admin123</p>
+      <p>pm / admin123</p>
+      <p>tech / admin123</p>
+    </div>
+  </div>
+</div>
+
+<div id="mainApp" class="page">
+  <div class="lg:hidden bg-primary text-white p-4 flex items-center justify-between">
+    <button onclick="toggleSidebar()" class="text-white"><i class="fas fa-bars text-xl"></i></button>
+    <span class="font-semibold">BIMS</span>
+    <button onclick="logout()" class="text-white"><i class="fas fa-sign-out-alt"></i></button>
+  </div>
+
+  <div class="flex min-h-screen">
+    <aside id="sidebar" class="sidebar sidebar-hidden lg:sidebar-hidden lg:!transform-none fixed lg:static inset-y-0 left-0 w-64 bg-white shadow-lg z-40 flex flex-col">
+      <div class="p-6 border-b flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+            <i class="fas fa-boxes text-white"></i>
+          </div>
+          <div>
+            <h2 class="font-bold text-gray-800 text-lg">Bigstar BIMS</h2>
+            <p class="text-xs text-gray-500">Inventory System</p>
+          </div>
+        </div>
+        <button onclick="toggleSidebar()" class="lg:hidden text-gray-500"><i class="fas fa-times"></i></button>
+      </div>
+      <nav class="flex-1 overflow-y-auto p-4 space-y-1">
+        <a href="#" onclick="showPage('dashboard')" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition" data-page="dashboard">
+          <i class="fas fa-tachometer-alt w-5"></i> Dashboard
+        </a>
+        <a href="#" onclick="showPage('items')" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition" data-page="items">
+          <i class="fas fa-box w-5"></i> Items & Stock
+        </a>
+        <a href="#" onclick="showPage('stockIn')" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition" data-page="stockIn">
+          <i class="fas fa-arrow-down w-5"></i> Stock In
+        </a>
+        <a href="#" onclick="showPage('stockOut')" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition" data-page="stockOut">
+          <i class="fas fa-arrow-up w-5"></i> Stock Out
+        </a>
+        <a href="#" onclick="showPage('transfer')" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition" data-page="transfer">
+          <i class="fas fa-exchange-alt w-5"></i> Transfer
+        </a>
+        <a href="#" onclick="showPage('movements')" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition" data-page="movements">
+          <i class="fas fa-history w-5"></i> Movements
+        </a>
+        <a href="#" onclick="showPage('purchaseOrders')" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition" data-page="purchaseOrders">
+          <i class="fas fa-file-invoice w-5"></i> Purchase Orders
+        </a>
+        <a href="#" onclick="showPage('deliveryOrders')" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition" data-page="deliveryOrders">
+          <i class="fas fa-truck w-5"></i> Delivery Orders
+        </a>
+        <a href="#" onclick="showPage('projects')" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition" data-page="projects">
+          <i class="fas fa-project-diagram w-5"></i> Projects
+        </a>
+        <a href="#" onclick="showPage('repairs')" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition" data-page="repairs">
+          <i class="fas fa-wrench w-5"></i> Repair Center
+        </a>
+        <div class="pt-4 mt-4 border-t">
+          <a href="#" onclick="showPage('locations')" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition" data-page="locations">
+            <i class="fas fa-map-marker-alt w-5"></i> Locations
+          </a>
+          <a href="#" onclick="showPage('categories')" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition" data-page="categories">
+            <i class="fas fa-tags w-5"></i> Categories
+          </a>
+          <a href="#" onclick="showPage('users')" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition" data-page="users">
+            <i class="fas fa-users w-5"></i> Users
+          </a>
+        </div>
+      </nav>
+      <div class="p-4 border-t">
+        <div class="flex items-center gap-3 px-4 py-2">
+          <div class="w-8 h-8 bg-secondary rounded-full flex items-center justify-center text-white text-sm font-bold" id="userAvatar">A</div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium text-gray-800 truncate" id="userName">Admin</p>
+            <p class="text-xs text-gray-500" id="userRole">Management</p>
+          </div>
+          <button onclick="logout()" class="text-gray-400 hover:text-danger transition" title="Logout">
+            <i class="fas fa-sign-out-alt"></i>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <div id="sidebarOverlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black/50 z-30 hidden lg:hidden"></div>
+
+    <main class="flex-1 overflow-y-auto">
+      <header class="hidden lg:flex items-center justify-between bg-white px-8 py-4 shadow-sm">
+        <h1 id="pageTitle" class="text-xl font-bold text-gray-800">Dashboard</h1>
+        <div class="flex items-center gap-4">
+          <span id="currentUser" class="text-sm text-gray-600"></span>
+          <button onclick="logout()" class="text-gray-500 hover:text-danger transition"><i class="fas fa-sign-out-alt"></i></button>
+        </div>
+      </header>
+
+      <div class="p-4 lg:p-8">
+
+        <div id="dashboard" class="app-page">
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white rounded-xl p-5 shadow-sm border">
+              <div class="flex items-center justify-between">
+                <div><p class="text-xs text-gray-500 uppercase">Total Items</p><p class="text-2xl font-bold text-gray-800" id="dashTotalItems">-</p></div>
+                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center"><i class="fas fa-box text-primary"></i></div>
+              </div>
+            </div>
+            <div class="bg-white rounded-xl p-5 shadow-sm border">
+              <div class="flex items-center justify-between">
+                <div><p class="text-xs text-gray-500 uppercase">Stock Value</p><p class="text-2xl font-bold text-gray-800" id="dashStockValue">-</p></div>
+                <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center"><i class="fas fa-dollar-sign text-success"></i></div>
+              </div>
+            </div>
+            <div class="bg-white rounded-xl p-5 shadow-sm border">
+              <div class="flex items-center justify-between">
+                <div><p class="text-xs text-gray-500 uppercase">Low Stock</p><p class="text-2xl font-bold text-danger" id="dashLowStock">-</p></div>
+                <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center"><i class="fas fa-exclamation-triangle text-danger"></i></div>
+              </div>
+            </div>
+            <div class="bg-white rounded-xl p-5 shadow-sm border">
+              <div class="flex items-center justify-between">
+                <div><p class="text-xs text-gray-500 uppercase">Pending</p><p class="text-2xl font-bold text-warning" id="dashPending">-</p></div>
+                <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center"><i class="fas fa-clock text-warning"></i></div>
+              </div>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="bg-white rounded-xl p-5 shadow-sm border lg:col-span-2">
+              <h3 class="font-semibold text-gray-800 mb-4">Recent Stock Movements</h3>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead class="bg-gray-50"><tr><th class="text-left px-3 py-2 font-medium text-gray-600">Type</th><th class="text-left px-3 py-2 font-medium text-gray-600">Item</th><th class="text-right px-3 py-2 font-medium text-gray-600">Qty</th><th class="text-left px-3 py-2 font-medium text-gray-600">Status</th></tr></thead>
+                  <tbody id="dashRecentTable"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="bg-white rounded-xl p-5 shadow-sm border">
+              <h3 class="font-semibold text-gray-800 mb-4">Quick Stats</h3>
+              <div class="space-y-3">
+                <div class="flex justify-between items-center"><span class="text-sm text-gray-600">Active Projects</span><span class="font-semibold text-primary" id="dashProjects">-</span></div>
+                <div class="flex justify-between items-center"><span class="text-sm text-gray-600">Open Repairs</span><span class="font-semibold text-danger" id="dashRepairs">-</span></div>
+                <div class="flex justify-between items-center"><span class="text-sm text-gray-600">Pending POs</span><span class="font-semibold text-warning" id="dashPOs">-</span></div>
+                <div class="flex justify-between items-center"><span class="text-sm text-gray-600">Pending DOs</span><span class="font-semibold text-secondary" id="dashDOs">-</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="items" class="app-page hidden">
+          <div class="flex flex-col lg:flex-row gap-4 mb-6">
+            <input type="text" id="itemSearch" placeholder="Search by name, SKU, brand..." class="flex-1 px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-primary" onkeyup="loadItems()">
+            <select id="itemTypeFilter" class="px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-primary" onchange="loadItems()">
+              <option value="">All Types</option><option value="product">Products</option><option value="raw_material">Raw Materials</option><option value="rental">Rental</option>
+            </select>
+            <select id="itemLocFilter" class="px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-primary" onchange="loadItems()">
+              <option value="">All Locations</option>
+            </select>
+            <button onclick="openModal('itemModal')" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition"><i class="fas fa-plus mr-1"></i> Add Item</button>
+          </div>
+          <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50"><tr><th class="text-left px-4 py-3 font-medium text-gray-600">SKU</th><th class="text-left px-4 py-3 font-medium text-gray-600">Name</th><th class="text-left px-4 py-3 font-medium text-gray-600">Type</th><th class="text-right px-4 py-3 font-medium text-gray-600">Stock</th><th class="text-right px-4 py-3 font-medium text-gray-600">Min</th><th class="text-right px-4 py-3 font-medium text-gray-600">Cost</th><th class="text-left px-4 py-3 font-medium text-gray-600">Actions</th></tr></thead>
+                <tbody id="itemsTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div id="stockIn" class="app-page hidden">
+          <div class="max-w-2xl mx-auto">
+            <div class="bg-white rounded-xl shadow-sm border p-6">
+              <h3 class="font-semibold text-gray-800 mb-4">Stock In (Receive)</h3>
+              <form id="stockInForm" onsubmit="handleStockIn(event)" class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Item</label>
+                  <select id="siItem" class="w-full px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-primary" required></select>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                    <input type="number" id="siQty" min="1" class="w-full px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-primary" required>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                    <select id="siLoc" class="w-full px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-primary" required></select>
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Serial Number</label>
+                    <input type="text" id="siSerial" class="w-full px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-primary" placeholder="Optional">
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Batch Number</label>
+                    <input type="text" id="siBatch" class="w-full px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-primary" placeholder="Optional">
+                  </div>
+                </div>
+                <button type="submit" class="w-full bg-success text-white py-2.5 rounded-lg font-medium hover:bg-green-700 transition"><i class="fas fa-arrow-down mr-1"></i> Receive Stock</button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <div id="stockOut" class="app-page hidden">
+          <div class="max-w-2xl mx-auto">
+            <div class="bg-white rounded-xl shadow-sm border p-6">
+              <h3 class="font-semibold text-gray-800 mb-4">Stock Out (Issue)</h3>
+              <form id="stockOutForm" onsubmit="handleStockOut(event)" class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Item</label>
+                  <select id="soItem" class="w-full px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-primary" required></select>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                    <input type="number" id="soQty" min="1" class="w-full px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-primary" required>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">From Location</label>
+                    <select id="soLoc" class="w-full px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-primary" required></select>
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Serial Number</label>
+                  <input type="text" id="soSerial" class="w-full px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-primary" placeholder="Optional">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Remarks</label>
+                  <textarea id="soRemarks" rows="2" class="w-full px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-primary" placeholder="Optional notes"></textarea>
+                </div>
+                <button type="submit" class="w-full bg-danger text-white py-2.5 rounded-lg font-medium hover:bg-red-700 transition"><i class="fas fa-arrow-up mr-1"></i> Issue Stock</button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <div id="transfer" class="app-page hidden">
+          <div class="max-w-2xl mx-auto">
+            <div class="bg-white rounded-xl shadow-sm border p-6">
+              <h3 class="font-semibold text-gray-800 mb-4">Stock Transfer</h3>
+              <form id="transferForm" onsubmit="handleTransfer(event)" class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Item</label>
+                  <select id="trItem" class="w-full px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-primary" required></select>
+                </div>
+                <div class="grid grid-cols-3 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                    <input type="number" id="trQty" min="1" class="w-full px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-primary" required>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">From</label>
+                    <select id="trFrom" class="w-full px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-primary" required></select>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">To</label>
+                    <select id="trTo" class="w-full px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-primary" required></select>
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Serial Number</label>
+                  <input type="text" id="trSerial" class="w-full px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-primary" placeholder="Optional">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Remarks</label>
+                  <textarea id="trRemarks" rows="2" class="w-full px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-primary" placeholder="Optional notes"></textarea>
+                </div>
+                <button type="submit" class="w-full bg-secondary text-white py-2.5 rounded-lg font-medium hover:bg-blue-600 transition"><i class="fas fa-exchange-alt mr-1"></i> Transfer Stock</button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <div id="movements" class="app-page hidden">
+          <div class="flex gap-4 mb-6">
+            <select id="mvTypeFilter" class="px-4 py-2 border rounded-lg outline-none" onchange="loadMovements()">
+              <option value="">All Types</option><option value="in">Stock In</option><option value="out">Stock Out</option><option value="transfer">Transfer</option>
+            </select>
+            <select id="mvStatusFilter" class="px-4 py-2 border rounded-lg outline-none" onchange="loadMovements()">
+              <option value="">All Status</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option>
+            </select>
+          </div>
+          <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50"><tr><th class="text-left px-4 py-3">Type</th><th class="text-left px-4 py-3">Item</th><th class="text-right px-4 py-3">Qty</th><th class="text-left px-4 py-3">From</th><th class="text-left px-4 py-3">To</th><th class="text-left px-4 py-3">Status</th><th class="text-left px-4 py-3">By</th><th class="text-left px-4 py-3">Actions</th></tr></thead>
+                <tbody id="movementsTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div id="purchaseOrders" class="app-page hidden">
+          <div class="flex gap-4 mb-6">
+            <select id="poStatusFilter" class="px-4 py-2 border rounded-lg outline-none" onchange="loadPOs()">
+              <option value="">All Status</option><option value="draft">Draft</option><option value="sent">Sent</option><option value="partial">Partial</option><option value="received">Received</option>
+            </select>
+            <button onclick="openModal('poModal')" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition"><i class="fas fa-plus mr-1"></i> New PO</button>
+          </div>
+          <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50"><tr><th class="text-left px-4 py-3">PO Number</th><th class="text-left px-4 py-3">Supplier</th><th class="text-right px-4 py-3">Amount</th><th class="text-left px-4 py-3">Status</th><th class="text-left px-4 py-3">Created</th><th class="text-left px-4 py-3">Actions</th></tr></thead>
+                <tbody id="poTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div id="deliveryOrders" class="app-page hidden">
+          <div class="flex gap-4 mb-6">
+            <select id="doStatusFilter" class="px-4 py-2 border rounded-lg outline-none" onchange="loadDOs()">
+              <option value="">All Status</option><option value="draft">Draft</option><option value="ready">Ready</option><option value="shipped">Shipped</option><option value="delivered">Delivered</option>
+            </select>
+            <button onclick="openModal('doModal')" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition"><i class="fas fa-plus mr-1"></i> New DO</button>
+          </div>
+          <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50"><tr><th class="text-left px-4 py-3">DO Number</th><th class="text-left px-4 py-3">Client</th><th class="text-left px-4 py-3">Status</th><th class="text-left px-4 py-3">Delivery Date</th><th class="text-left px-4 py-3">Actions</th></tr></thead>
+                <tbody id="doTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div id="projects" class="app-page hidden">
+          <div class="flex gap-4 mb-6">
+            <button onclick="openModal('projectModal')" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition"><i class="fas fa-plus mr-1"></i> New Project</button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="projectsGrid"></div>
+        </div>
+
+        <div id="repairs" class="app-page hidden">
+          <div class="flex gap-4 mb-6">
+            <select id="repairStatusFilter" class="px-4 py-2 border rounded-lg outline-none" onchange="loadRepairs()">
+              <option value="">All Status</option><option value="received">Received</option><option value="diagnosing">Diagnosing</option><option value="repairing">Repairing</option><option value="testing">Testing</option><option value="completed">Completed</option>
+            </select>
+            <button onclick="openModal('repairModal')" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition"><i class="fas fa-plus mr-1"></i> New Ticket</button>
+          </div>
+          <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50"><tr><th class="text-left px-4 py-3">Ticket #</th><th class="text-left px-4 py-3">Item</th><th class="text-left px-4 py-3">Serial</th><th class="text-left px-4 py-3">Client</th><th class="text-left px-4 py-3">Status</th><th class="text-left px-4 py-3">Technician</th><th class="text-left px-4 py-3">Actions</th></tr></thead>
+                <tbody id="repairsTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div id="locations" class="app-page hidden">
+          <div class="flex gap-4 mb-6">
+            <button onclick="openModal('locationModal')" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition"><i class="fas fa-plus mr-1"></i> Add Location</button>
+          </div>
+          <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50"><tr><th class="text-left px-4 py-3">Name</th><th class="text-left px-4 py-3">Type</th><th class="text-left px-4 py-3">Address</th><th class="text-left px-4 py-3">Contact</th></tr></thead>
+                <tbody id="locationsTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div id="categories" class="app-page hidden">
+          <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50"><tr><th class="text-left px-4 py-3">Name</th><th class="text-left px-4 py-3">Type</th><th class="text-left px-4 py-3">Description</th></tr></thead>
+                <tbody id="categoriesTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div id="users" class="app-page hidden">
+          <div class="flex gap-4 mb-6">
+            <button onclick="openModal('userModal')" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition"><i class="fas fa-plus mr-1"></i> Add User</button>
+          </div>
+          <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50"><tr><th class="text-left px-4 py-3">Username</th><th class="text-left px-4 py-3">Full Name</th><th class="text-left px-4 py-3">Role</th><th class="text-left px-4 py-3">Status</th></tr></thead>
+                <tbody id="usersTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+</div>
+
+<div id="itemModal" class="modal fixed inset-0 bg-black/50 z-50 items-center justify-center p-4">
+  <div class="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="font-semibold text-lg">Add New Item</h3>
+      <button onclick="closeModal('itemModal')" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="itemForm" onsubmit="handleItemSubmit(event)" class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium mb-1">SKU</label><input type="text" name="sku" class="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary" required></div>
+        <div><label class="block text-xs font-medium mb-1">Name</label><input type="text" name="name" class="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary" required></div>
+      </div>
+      <div><label class="block text-xs font-medium mb-1">Description</label><textarea name="description" rows="2" class="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary"></textarea></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium mb-1">Type</label><select name="item_type" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"><option value="product">Product</option><option value="raw_material">Raw Material</option><option value="rental">Rental</option></select></div>
+        <div><label class="block text-xs font-medium mb-1">Category</label><select name="category_id" id="itemCatSelect" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></select></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium mb-1">Brand</label><input type="text" name="brand" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></div>
+        <div><label class="block text-xs font-medium mb-1">Model</label><input type="text" name="model" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></div>
+      </div>
+      <div class="grid grid-cols-3 gap-3">
+        <div><label class="block text-xs font-medium mb-1">Unit</label><input type="text" name="unit" value="pcs" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></div>
+        <div><label class="block text-xs font-medium mb-1">Min Stock</label><input type="number" name="min_stock" value="0" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></div>
+        <div><label class="block text-xs font-medium mb-1">Unit Cost</label><input type="number" name="unit_cost" step="0.01" value="0" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></div>
+      </div>
+      <div class="flex gap-4">
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="track_serial" class="rounded"> Track Serial #</label>
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="track_batch" class="rounded"> Track Batch #</label>
+      </div>
+      <button type="submit" class="w-full bg-primary text-white py-2 rounded-lg font-medium hover:bg-blue-800">Save Item</button>
+    </form>
+  </div>
+</div>
+
+<div id="poModal" class="modal fixed inset-0 bg-black/50 z-50 items-center justify-center p-4">
+  <div class="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="font-semibold text-lg">New Purchase Order</h3>
+      <button onclick="closeModal('poModal')" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="poForm" onsubmit="handlePOSubmit(event)" class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium mb-1">PO Number</label><input type="text" name="po_number" class="w-full px-3 py-2 border rounded-lg text-sm outline-none" required></div>
+        <div><label class="block text-xs font-medium mb-1">Supplier</label><input type="text" name="supplier_name" class="w-full px-3 py-2 border rounded-lg text-sm outline-none" required></div>
+      </div>
+      <div><label class="block text-xs font-medium mb-1">Supplier Contact</label><input type="text" name="supplier_contact" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium mb-1">Expected Date</label><input type="date" name="expected_date" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></div>
+        <div><label class="block text-xs font-medium mb-1">Total Amount</label><input type="number" name="total_amount" step="0.01" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></div>
+      </div>
+      <div>
+        <label class="block text-xs font-medium mb-1">Items (JSON: [{"item_id":1,"quantity":10,"unit_price":5.0}])</label>
+        <textarea name="items" rows="3" class="w-full px-3 py-2 border rounded-lg text-sm outline-none font-mono" placeholder='[{"item_id":1,"quantity":10,"unit_price":5.0}]'>[]</textarea>
+      </div>
+      <div><label class="block text-xs font-medium mb-1">Remarks</label><textarea name="remarks" rows="2" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></textarea></div>
+      <button type="submit" class="w-full bg-primary text-white py-2 rounded-lg font-medium hover:bg-blue-800">Create PO</button>
+    </form>
+  </div>
+</div>
+
+<div id="doModal" class="modal fixed inset-0 bg-black/50 z-50 items-center justify-center p-4">
+  <div class="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="font-semibold text-lg">New Delivery Order</h3>
+      <button onclick="closeModal('doModal')" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="doForm" onsubmit="handleDOSubmit(event)" class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium mb-1">DO Number</label><input type="text" name="do_number" class="w-full px-3 py-2 border rounded-lg text-sm outline-none" required></div>
+        <div><label class="block text-xs font-medium mb-1">Client Name</label><input type="text" name="client_name" class="w-full px-3 py-2 border rounded-lg text-sm outline-none" required></div>
+      </div>
+      <div><label class="block text-xs font-medium mb-1">Client Address</label><textarea name="client_address" rows="2" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></textarea></div>
+      <div><label class="block text-xs font-medium mb-1">Client Contact</label><input type="text" name="client_contact" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium mb-1">Delivery Date</label><input type="date" name="delivery_date" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></div>
+        <div><label class="block text-xs font-medium mb-1">Project</label><select name="project_id" id="doProjectSelect" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"><option value="">None</option></select></div>
+      </div>
+      <div>
+        <label class="block text-xs font-medium mb-1">Items (JSON: [{"item_id":1,"quantity":5}])</label>
+        <textarea name="items" rows="3" class="w-full px-3 py-2 border rounded-lg text-sm outline-none font-mono" placeholder='[{"item_id":1,"quantity":5}]'>[]</textarea>
+      </div>
+      <button type="submit" class="w-full bg-primary text-white py-2 rounded-lg font-medium hover:bg-blue-800">Create DO</button>
+    </form>
+  </div>
+</div>
+
+<div id="projectModal" class="modal fixed inset-0 bg-black/50 z-50 items-center justify-center p-4">
+  <div class="bg-white rounded-xl max-w-lg w-full p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="font-semibold text-lg">New Project</h3>
+      <button onclick="closeModal('projectModal')" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="projectForm" onsubmit="handleProjectSubmit(event)" class="space-y-3">
+      <div><label class="block text-xs font-medium mb-1">Project Name</label><input type="text" name="name" class="w-full px-3 py-2 border rounded-lg text-sm outline-none" required></div>
+      <div><label class="block text-xs font-medium mb-1">Description</label><textarea name="description" rows="2" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></textarea></div>
+      <div><label class="block text-xs font-medium mb-1">Client Name</label><input type="text" name="client_name" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium mb-1">Start Date</label><input type="date" name="start_date" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></div>
+        <div><label class="block text-xs font-medium mb-1">End Date</label><input type="date" name="end_date" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></div>
+      </div>
+      <button type="submit" class="w-full bg-primary text-white py-2 rounded-lg font-medium hover:bg-blue-800">Create Project</button>
+    </form>
+  </div>
+</div>
+
+<div id="repairModal" class="modal fixed inset-0 bg-black/50 z-50 items-center justify-center p-4">
+  <div class="bg-white rounded-xl max-w-lg w-full p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="font-semibold text-lg">New Repair Ticket</h3>
+      <button onclick="closeModal('repairModal')" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="repairForm" onsubmit="handleRepairSubmit(event)" class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium mb-1">Ticket Number</label><input type="text" name="ticket_number" class="w-full px-3 py-2 border rounded-lg text-sm outline-none" required></div>
+        <div><label class="block text-xs font-medium mb-1">Item</label><select name="item_id" id="repairItemSelect" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></select></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium mb-1">Serial Number</label><input type="text" name="serial_number" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></div>
+        <div><label class="block text-xs font-medium mb-1">Client Name</label><input type="text" name="client_name" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></div>
+      </div>
+      <div><label class="block text-xs font-medium mb-1">Issue Description</label><textarea name="issue_description" rows="3" class="w-full px-3 py-2 border rounded-lg text-sm outline-none" required></textarea></div>
+      <div><label class="block text-xs font-medium mb-1">Location</label><select name="location_id" id="repairLocSelect" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></select></div>
+      <div><label class="block text-xs font-medium mb-1">Remarks</label><textarea name="remarks" rows="2" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></textarea></div>
+      <button type="submit" class="w-full bg-primary text-white py-2 rounded-lg font-medium hover:bg-blue-800">Create Ticket</button>
+    </form>
+  </div>
+</div>
+
+<div id="locationModal" class="modal fixed inset-0 bg-black/50 z-50 items-center justify-center p-4">
+  <div class="bg-white rounded-xl max-w-md w-full p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="font-semibold text-lg">Add Location</h3>
+      <button onclick="closeModal('locationModal')" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="locationForm" onsubmit="handleLocationSubmit(event)" class="space-y-3">
+      <div><label class="block text-xs font-medium mb-1">Name</label><input type="text" name="name" class="w-full px-3 py-2 border rounded-lg text-sm outline-none" required></div>
+      <div><label class="block text-xs font-medium mb-1">Type</label><select name="location_type" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"><option value="warehouse">Warehouse</option><option value="repair">Repair Center</option><option value="client_site">Client Site</option><option value="thailand">Thailand Office</option></select></div>
+      <div><label class="block text-xs font-medium mb-1">Address</label><textarea name="address" rows="2" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></textarea></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium mb-1">Contact Person</label><input type="text" name="contact_person" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></div>
+        <div><label class="block text-xs font-medium mb-1">Contact Phone</label><input type="text" name="contact_phone" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></div>
+      </div>
+      <button type="submit" class="w-full bg-primary text-white py-2 rounded-lg font-medium hover:bg-blue-800">Save Location</button>
+    </form>
+  </div>
+</div>
+
+<div id="userModal" class="modal fixed inset-0 bg-black/50 z-50 items-center justify-center p-4">
+  <div class="bg-white rounded-xl max-w-md w-full p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="font-semibold text-lg">Add User</h3>
+      <button onclick="closeModal('userModal')" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="userForm" onsubmit="handleUserSubmit(event)" class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium mb-1">Username</label><input type="text" name="username" class="w-full px-3 py-2 border rounded-lg text-sm outline-none" required></div>
+        <div><label class="block text-xs font-medium mb-1">Full Name</label><input type="text" name="full_name" class="w-full px-3 py-2 border rounded-lg text-sm outline-none" required></div>
+      </div>
+      <div><label class="block text-xs font-medium mb-1">Email</label><input type="email" name="email" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium mb-1">Password</label><input type="password" name="password" class="w-full px-3 py-2 border rounded-lg text-sm outline-none" required></div>
+        <div><label class="block text-xs font-medium mb-1">Role</label><select name="role" class="w-full px-3 py-2 border rounded-lg text-sm outline-none"><option value="warehouse">Warehouse</option><option value="management">Management</option><option value="sales">Sales</option><option value="pm">Project Manager</option><option value="technician">Technician</option></select></div>
+      </div>
+      <button type="submit" class="w-full bg-primary text-white py-2 rounded-lg font-medium hover:bg-blue-800">Create User</button>
+    </form>
+  </div>
+</div>
+
+<script>
+const API_BASE = '';
+let authToken = localStorage.getItem('bims_token');
+let currentUser = null;
+let allItems = [];
+let allLocations = [];
+
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const username = document.getElementById('loginUser').value;
+  const password = document.getElementById('loginPass').value;
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/login`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({username, password})
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Login failed');
+    authToken = data.access_token;
+    currentUser = data.user;
+    localStorage.setItem('bims_token', authToken);
+    showMainApp();
+    toast('Login successful!', 'success');
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+});
+
+function logout() {
+  authToken = null; currentUser = null;
+  localStorage.removeItem('bims_token');
+  document.getElementById('loginPage').classList.add('active');
+  document.getElementById('mainApp').classList.remove('active');
+  document.getElementById('loginForm').reset();
+}
+
+async function checkAuth() {
+  if (!authToken) return false;
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/me`, {headers: {'Authorization': `Bearer ${authToken}`}});
+    if (!res.ok) { authToken = null; localStorage.removeItem('bims_token'); return false; }
+    currentUser = await res.json();
+    return true;
+  } catch { authToken = null; localStorage.removeItem('bims_token'); return false; }
+}
+
+function showPage(pageName) {
+  document.querySelectorAll('.app-page').forEach(p => p.classList.add('hidden'));
+  const page = document.getElementById(pageName);
+  if (page) page.classList.remove('hidden');
+  document.querySelectorAll('.nav-link').forEach(l => {
+    l.classList.toggle('bg-blue-50', l.dataset.page === pageName);
+    l.classList.toggle('text-primary', l.dataset.page === pageName);
+  });
+  document.getElementById('pageTitle').textContent = pageName.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+  document.getElementById('sidebar').classList.add('sidebar-hidden');
+  document.getElementById('sidebarOverlay').classList.add('hidden');
+
+  if (pageName === 'dashboard') loadDashboard();
+  if (pageName === 'items') loadItems();
+  if (pageName === 'stockIn') { loadItemsSelect('siItem'); loadLocationsSelect('siLoc'); }
+  if (pageName === 'stockOut') { loadItemsSelect('soItem'); loadLocationsSelect('soLoc'); }
+  if (pageName === 'transfer') { loadItemsSelect('trItem'); loadLocationsSelect('trFrom'); loadLocationsSelect('trTo'); }
+  if (pageName === 'movements') loadMovements();
+  if (pageName === 'purchaseOrders') loadPOs();
+  if (pageName === 'deliveryOrders') loadDOs();
+  if (pageName === 'projects') loadProjects();
+  if (pageName === 'repairs') loadRepairs();
+  if (pageName === 'locations') loadLocations();
+  if (pageName === 'categories') loadCategories();
+  if (pageName === 'users') loadUsers();
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('sidebar-hidden');
+  document.getElementById('sidebarOverlay').classList.toggle('hidden');
+}
+
+async function showMainApp() {
+  document.getElementById('loginPage').classList.remove('active');
+  document.getElementById('mainApp').classList.add('active');
+  document.getElementById('userName').textContent = currentUser?.full_name || 'User';
+  document.getElementById('userRole').textContent = (currentUser?.role || '').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+  document.getElementById('userAvatar').textContent = (currentUser?.full_name || 'U')[0].toUpperCase();
+  document.getElementById('currentUser').textContent = currentUser?.full_name || '';
+  await loadLocationsData();
+  await loadItemsData();
+  showPage('dashboard');
+}
+
+async function api(url, opts = {}) {
+  opts.headers = opts.headers || {};
+  if (authToken) opts.headers['Authorization'] = `Bearer ${authToken}`;
+  if (opts.body && typeof opts.body === 'object' && !(opts.body instanceof FormData)) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(opts.body);
+  }
+  const res = await fetch(API_BASE + url, opts);
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : {};
+  if (!res.ok) throw new Error(data.detail || `Error ${res.status}`);
+  return data;
+}
+
+function toast(message, type = 'info') {
+  const colors = {success:'bg-green-500', error:'bg-red-500', warning:'bg-yellow-500', info:'bg-blue-500'};
+  const icons = {success:'check', error:'exclamation', warning:'exclamation-triangle', info:'info'};
+  const div = document.createElement('div');
+  div.className = `toast ${colors[type]} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 min-w-[250px]`;
+  div.innerHTML = `<i class="fas fa-${icons[type]}-circle"></i><span>${message}</span>`;
+  document.getElementById('toastContainer').appendChild(div);
+  setTimeout(() => div.remove(), 3000);
+}
+
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); document.getElementById(id).querySelector('form')?.reset(); }
+
+async function loadLocationsData() {
+  const data = await api('/api/locations');
+  allLocations = data.locations;
+  const sel = document.getElementById('itemLocFilter');
+  sel.innerHTML = '<option value="">All Locations</option>' + allLocations.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+}
+
+async function loadItemsData() {
+  const data = await api('/api/items?limit=1000');
+  allItems = data.items;
+}
+
+function loadItemsSelect(id) {
+  const sel = document.getElementById(id);
+  sel.innerHTML = '<option value="">Select Item</option>' + allItems.map(i => `<option value="${i.id}">${i.sku} - ${i.name}</option>`).join('');
+}
+
+function loadLocationsSelect(id) {
+  const sel = document.getElementById(id);
+  sel.innerHTML = '<option value="">Select Location</option>' + allLocations.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+}
+
+async function loadDashboard() {
+  try {
+    const data = await api('/api/dashboard');
+    document.getElementById('dashTotalItems').textContent = data.total_items;
+    document.getElementById('dashStockValue').textContent = '$' + Number(data.total_stock_value).toLocaleString();
+    document.getElementById('dashLowStock').textContent = data.low_stock_count;
+    document.getElementById('dashPending').textContent = data.pending_movements;
+    document.getElementById('dashProjects').textContent = data.active_projects;
+    document.getElementById('dashRepairs').textContent = data.open_repairs;
+    document.getElementById('dashPOs').textContent = data.pending_po;
+    document.getElementById('dashDOs').textContent = data.pending_do;
+    const tbody = document.getElementById('dashRecentTable');
+    tbody.innerHTML = (data.recent_movements || []).map(m => {
+      const colors = {in:'bg-green-100 text-green-700', out:'bg-red-100 text-red-700', transfer:'bg-blue-100 text-blue-700'};
+      const scolors = {pending:'bg-yellow-100 text-yellow-700', approved:'bg-green-100 text-green-700', rejected:'bg-red-100 text-red-700'};
+      return `<tr class="border-t"><td class="px-3 py-2"><span class="px-2 py-1 rounded text-xs ${colors[m.movement_type]||''}">${m.movement_type.toUpperCase()}</span></td><td class="px-3 py-2">${m.item_name}</td><td class="px-3 py-2 text-right">${m.quantity}</td><td class="px-3 py-2"><span class="px-2 py-1 rounded text-xs ${scolors[m.status]||''}">${m.status}</span></td></tr>`;
+    }).join('') || '<tr><td colspan="4" class="px-3 py-4 text-center text-gray-500">No recent movements</td></tr>';
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function loadItems() {
+  try {
+    const search = document.getElementById('itemSearch').value;
+    const type = document.getElementById('itemTypeFilter').value;
+    const loc = document.getElementById('itemLocFilter').value;
+    let url = `/api/items?limit=100`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (type) url += `&item_type=${type}`;
+    if (loc) url += `&location_id=${loc}`;
+    const data = await api(url);
+    const tbody = document.getElementById('itemsTable');
+    tbody.innerHTML = data.items.map(i => {
+      const stockColor = i.is_low_stock ? 'text-danger' : 'text-gray-800';
+      const typeColors = {product:'bg-blue-100 text-blue-700', raw_material:'bg-orange-100 text-orange-700', rental:'bg-purple-100 text-purple-700'};
+      return `<tr class="table-row border-t">
+        <td class="px-4 py-3 font-medium">${i.sku}</td>
+        <td class="px-4 py-3">${i.name}</td>
+        <td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs ${typeColors[i.item_type]||''}">${i.item_type.replace('_',' ')}</span></td>
+        <td class="px-4 py-3 text-right font-semibold ${stockColor}">${i.total_stock}</td>
+        <td class="px-4 py-3 text-right text-gray-500">${i.min_stock}</td>
+        <td class="px-4 py-3 text-right">$${i.unit_cost}</td>
+        <td class="px-4 py-3"><button onclick="viewItem(${i.id})" class="text-primary hover:underline text-xs">View</button></td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">No items found</td></tr>';
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function viewItem(id) {
+  try {
+    const item = await api(`/api/items/${id}`);
+    let stockInfo = item.stock.map(s => `${s.location_name}: ${s.quantity} (${s.status})`).join('\n') || 'No stock';
+    alert(`SKU: ${item.sku}\nName: ${item.name}\nType: ${item.item_type}\nBrand: ${item.brand || '-'}\nModel: ${item.model || '-'}\nCategory: ${item.category_name || '-'}\nUnit Cost: $${item.unit_cost}\nSelling Price: $${item.selling_price}\nTrack Serial: ${item.track_serial ? 'Yes' : 'No'}\nTrack Batch: ${item.track_batch ? 'Yes' : 'No'}\n\nStock:\n${stockInfo}`);
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function handleItemSubmit(e) {
+  e.preventDefault();
+  const form = e.target;
+  const data = Object.fromEntries(new FormData(form));
+  data.item_type = form.item_type.value;
+  data.category_id = form.category_id.value ? parseInt(form.category_id.value) : null;
+  data.min_stock = parseInt(data.min_stock) || 0;
+  data.unit_cost = parseFloat(data.unit_cost) || 0;
+  data.selling_price = parseFloat(data.selling_price) || 0;
+  data.track_serial = !!data.track_serial;
+  data.track_batch = !!data.track_batch;
+  try {
+    await api('/api/items', {method:'POST', body:data});
+    closeModal('itemModal'); toast('Item created!', 'success'); loadItems(); loadItemsData();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function handleStockIn(e) {
+  e.preventDefault();
+  try {
+    await api('/api/stock/in', {method:'POST', body:{
+      item_id: parseInt(document.getElementById('siItem').value),
+      quantity: parseInt(document.getElementById('siQty').value),
+      location_id: parseInt(document.getElementById('siLoc').value),
+      serial_number: document.getElementById('siSerial').value || null,
+      batch_number: document.getElementById('siBatch').value || null
+    }});
+    toast('Stock received successfully!', 'success');
+    document.getElementById('stockInForm').reset();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function handleStockOut(e) {
+  e.preventDefault();
+  try {
+    await api('/api/stock/out', {method:'POST', body:{
+      item_id: parseInt(document.getElementById('soItem').value),
+      quantity: parseInt(document.getElementById('soQty').value),
+      location_id: parseInt(document.getElementById('soLoc').value),
+      serial_number: document.getElementById('soSerial').value || null,
+      remarks: document.getElementById('soRemarks').value || null
+    }});
+    toast('Stock issued successfully!', 'success');
+    document.getElementById('stockOutForm').reset();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function handleTransfer(e) {
+  e.preventDefault();
+  try {
+    await api('/api/stock/transfer', {method:'POST', body:{
+      item_id: parseInt(document.getElementById('trItem').value),
+      quantity: parseInt(document.getElementById('trQty').value),
+      from_location_id: parseInt(document.getElementById('trFrom').value),
+      to_location_id: parseInt(document.getElementById('trTo').value),
+      serial_number: document.getElementById('trSerial').value || null,
+      remarks: document.getElementById('trRemarks').value || null
+    }});
+    toast('Stock transferred successfully!', 'success');
+    document.getElementById('transferForm').reset();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function loadMovements() {
+  try {
+    const type = document.getElementById('mvTypeFilter').value;
+    const status = document.getElementById('mvStatusFilter').value;
+    let url = '/api/stock/movements?limit=100';
+    if (type) url += `&movement_type=${type}`;
+    if (status) url += `&status=${status}`;
+    const data = await api(url);
+    const tbody = document.getElementById('movementsTable');
+    const tcolors = {in:'bg-green-100 text-green-700', out:'bg-red-100 text-red-700', transfer:'bg-blue-100 text-blue-700'};
+    const scolors = {pending:'bg-yellow-100 text-yellow-700', approved:'bg-green-100 text-green-700', rejected:'bg-red-100 text-red-700'};
+    tbody.innerHTML = data.movements.map(m => `<tr class="border-t">
+      <td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs ${tcolors[m.movement_type]||''}">${m.movement_type.toUpperCase()}</span></td>
+      <td class="px-4 py-3">${m.item_name}</td>
+      <td class="px-4 py-3 text-right">${m.quantity}</td>
+      <td class="px-4 py-3">${m.from_location_name || '-'}</td>
+      <td class="px-4 py-3">${m.to_location_name || '-'}</td>
+      <td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs ${scolors[m.status]||''}">${m.status}</span></td>
+      <td class="px-4 py-3">${m.performed_by_name}</td>
+      <td class="px-4 py-3">${m.status === 'pending' ? `<button onclick="approveMv(${m.id})" class="text-success hover:underline text-xs mr-2">Approve</button><button onclick="rejectMv(${m.id})" class="text-danger hover:underline text-xs">Reject</button>` : '-'}</td>
+    </tr>`).join('') || '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-500">No movements</td></tr>';
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function approveMv(id) { try { await api(`/api/stock/movements/${id}/approve`, {method:'POST'}); toast('Approved', 'success'); loadMovements(); } catch(err){ toast(err.message,'error'); } }
+async function rejectMv(id) { try { await api(`/api/stock/movements/${id}/reject`, {method:'POST'}); toast('Rejected', 'warning'); loadMovements(); } catch(err){ toast(err.message,'error'); } }
+
+async function loadPOs() {
+  try {
+    const status = document.getElementById('poStatusFilter').value;
+    let url = '/api/purchase-orders?limit=100';
+    if (status) url += `&status=${status}`;
+    const data = await api(url);
+    const tbody = document.getElementById('poTable');
+    const scolors = {draft:'bg-gray-100', sent:'bg-blue-100 text-blue-700', partial:'bg-yellow-100 text-yellow-700', received:'bg-green-100 text-green-700'};
+    tbody.innerHTML = data.purchase_orders.map(po => `<tr class="border-t">
+      <td class="px-4 py-3 font-medium">${po.po_number}</td>
+      <td class="px-4 py-3">${po.supplier_name}</td>
+      <td class="px-4 py-3 text-right">$${Number(po.total_amount).toLocaleString()}</td>
+      <td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs ${scolors[po.status]||''}">${po.status}</span></td>
+      <td class="px-4 py-3 text-gray-500">${new Date(po.created_at).toLocaleDateString()}</td>
+      <td class="px-4 py-3"><button onclick="viewPO(${po.id})" class="text-primary hover:underline text-xs">View</button></td>
+    </tr>`).join('') || '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">No purchase orders</td></tr>';
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function handlePOSubmit(e) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  try {
+    await api('/api/purchase-orders', {method:'POST', body:{
+      po_number: fd.get('po_number'), supplier_name: fd.get('supplier_name'), supplier_contact: fd.get('supplier_contact'),
+      total_amount: parseFloat(fd.get('total_amount')) || 0, expected_date: fd.get('expected_date') || null,
+      remarks: fd.get('remarks') || null, items: JSON.parse(fd.get('items') || '[]')
+    }});
+    closeModal('poModal'); toast('Purchase order created!', 'success'); loadPOs();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function viewPO(id) {
+  try {
+    const po = await api(`/api/purchase-orders/${id}`);
+    const items = po.items.map(i => `- ${i.item_name} (x${i.quantity}) @ $${i.unit_price}`).join('\n');
+    alert(`PO: ${po.po_number}\nSupplier: ${po.supplier_name}\nTotal: $${po.total_amount}\nStatus: ${po.status}\n\nItems:\n${items}`);
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function loadDOs() {
+  try {
+    const status = document.getElementById('doStatusFilter').value;
+    let url = '/api/delivery-orders?limit=100';
+    if (status) url += `&status=${status}`;
+    const data = await api(url);
+    const tbody = document.getElementById('doTable');
+    tbody.innerHTML = data.delivery_orders.map(d => `<tr class="border-t">
+      <td class="px-4 py-3 font-medium">${d.do_number}</td>
+      <td class="px-4 py-3">${d.client_name}</td>
+      <td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs bg-blue-100 text-blue-700">${d.status}</span></td>
+      <td class="px-4 py-3">${d.delivery_date || '-'}</td>
+      <td class="px-4 py-3"><button onclick="viewDO(${d.id})" class="text-primary hover:underline text-xs">View</button></td>
+    </tr>`).join('') || '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No delivery orders</td></tr>';
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function handleDOSubmit(e) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  try {
+    await api('/api/delivery-orders', {method:'POST', body:{
+      do_number: fd.get('do_number'), client_name: fd.get('client_name'), client_address: fd.get('client_address'),
+      client_contact: fd.get('client_contact'), project_id: fd.get('project_id') || null,
+      delivery_date: fd.get('delivery_date') || null, items: JSON.parse(fd.get('items') || '[]')
+    }});
+    closeModal('doModal'); toast('Delivery order created!', 'success'); loadDOs();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function viewDO(id) {
+  try {
+    const d = await api(`/api/delivery-orders/${id}`);
+    const items = d.items.map(i => `- ${i.item_name} (x${i.quantity})`).join('\n');
+    alert(`DO: ${d.do_number}\nClient: ${d.client_name}\nStatus: ${d.status}\n\nItems:\n${items}`);
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function loadProjects() {
+  try {
+    const data = await api('/api/projects');
+    const grid = document.getElementById('projectsGrid');
+    const scolors = {active:'bg-green-100 text-green-700', completed:'bg-blue-100 text-blue-700', on_hold:'bg-yellow-100 text-yellow-700', cancelled:'bg-red-100 text-red-700'};
+    grid.innerHTML = data.projects.map(p => `<div class="bg-white rounded-xl shadow-sm border p-5">
+      <div class="flex justify-between items-start mb-3">
+        <h4 class="font-semibold text-gray-800">${p.name}</h4>
+        <span class="px-2 py-1 rounded text-xs ${scolors[p.status]||''}">${p.status}</span>
+      </div>
+      <p class="text-sm text-gray-500 mb-2">${p.client_name || 'No client'}</p>
+      <p class="text-xs text-gray-400">${p.start_date || ''} - ${p.end_date || ''}</p>
+      <p class="text-xs text-gray-500 mt-2">PM: ${p.project_manager_name || 'Unassigned'}</p>
+    </div>`).join('') || '<div class="col-span-3 text-center text-gray-500 py-8">No projects</div>';
+    const doSel = document.getElementById('doProjectSelect');
+    doSel.innerHTML = '<option value="">None</option>' + data.projects.filter(p=>p.status==='active').map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function handleProjectSubmit(e) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  try {
+    await api('/api/projects', {method:'POST', body:{
+      name: fd.get('name'), description: fd.get('description'), client_name: fd.get('client_name'),
+      start_date: fd.get('start_date') || null, end_date: fd.get('end_date') || null
+    }});
+    closeModal('projectModal'); toast('Project created!', 'success'); loadProjects();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function loadRepairs() {
+  try {
+    const status = document.getElementById('repairStatusFilter').value;
+    let url = '/api/repair-tickets';
+    if (status) url += `?status=${status}`;
+    const data = await api(url);
+    const tbody = document.getElementById('repairsTable');
+    const scolors = {received:'bg-gray-100', diagnosing:'bg-yellow-100 text-yellow-700', repairing:'bg-orange-100 text-orange-700', testing:'bg-blue-100 text-blue-700', completed:'bg-green-100 text-green-700', returned:'bg-purple-100 text-purple-700'};
+    tbody.innerHTML = data.repair_tickets.map(t => `<tr class="border-t">
+      <td class="px-4 py-3 font-medium">${t.ticket_number}</td>
+      <td class="px-4 py-3">${t.item_name}</td>
+      <td class="px-4 py-3">${t.serial_number || '-'}</td>
+      <td class="px-4 py-3">${t.client_name || '-'}</td>
+      <td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs ${scolors[t.status]||''}">${t.status}</span></td>
+      <td class="px-4 py-3">${t.technician_name || '-'}</td>
+      <td class="px-4 py-3"><button onclick="updateRepair(${t.id})" class="text-primary hover:underline text-xs">Update</button></td>
+    </tr>`).join('') || '<tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">No repair tickets</td></tr>';
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function handleRepairSubmit(e) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  try {
+    await api('/api/repair-tickets', {method:'POST', body:{
+      ticket_number: fd.get('ticket_number'), item_id: parseInt(fd.get('item_id')),
+      serial_number: fd.get('serial_number') || null, client_name: fd.get('client_name') || null,
+      issue_description: fd.get('issue_description'), location_id: parseInt(fd.get('location_id')) || null,
+      remarks: fd.get('remarks') || null
+    }});
+    closeModal('repairModal'); toast('Repair ticket created!', 'success'); loadRepairs();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function updateRepair(id) {
+  const newStatus = prompt('Enter new status:\nreceived, diagnosing, repairing, testing, completed, returned');
+  if (!newStatus) return;
+  try { await api(`/api/repair-tickets/${id}/status`, {method:'PUT', body:{status:newStatus}}); toast('Updated!', 'success'); loadRepairs(); }
+  catch(err){ toast(err.message,'error'); }
+}
+
+async function loadLocations() {
+  try {
+    const data = await api('/api/locations');
+    const tbody = document.getElementById('locationsTable');
+    tbody.innerHTML = data.locations.map(l => `<tr class="border-t">
+      <td class="px-4 py-3 font-medium">${l.name}</td>
+      <td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs bg-gray-100">${l.location_type}</span></td>
+      <td class="px-4 py-3 text-gray-500">${l.address || '-'}</td>
+      <td class="px-4 py-3 text-gray-500">${l.contact_person || '-'} ${l.contact_phone || ''}</td>
+    </tr>`).join('');
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function handleLocationSubmit(e) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  try {
+    await api('/api/locations', {method:'POST', body:Object.fromEntries(fd)});
+    closeModal('locationModal'); toast('Location added!', 'success'); loadLocations(); loadLocationsData();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function loadCategories() {
+  try {
+    const data = await api('/api/categories');
+    const tbody = document.getElementById('categoriesTable');
+    const tcolors = {product:'bg-blue-100 text-blue-700', raw_material:'bg-orange-100 text-orange-700', rental:'bg-purple-100 text-purple-700'};
+    tbody.innerHTML = data.categories.map(c => `<tr class="border-t">
+      <td class="px-4 py-3 font-medium">${c.name}</td>
+      <td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs ${tcolors[c.category_type]||''}">${c.category_type.replace('_',' ')}</span></td>
+      <td class="px-4 py-3 text-gray-500">${c.description || '-'}</td>
+    </tr>`).join('');
+    const catSel = document.getElementById('itemCatSelect');
+    catSel.innerHTML = data.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    const repItemSel = document.getElementById('repairItemSelect');
+    repItemSel.innerHTML = allItems.map(i => `<option value="${i.id}">${i.sku} - ${i.name}</option>`).join('');
+    const repLocSel = document.getElementById('repairLocSelect');
+    repLocSel.innerHTML = '<option value="">Select Location</option>' + allLocations.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function loadUsers() {
+  try {
+    const data = await api('/api/users');
+    const tbody = document.getElementById('usersTable');
+    const rcolors = {management:'bg-red-100 text-red-700', warehouse:'bg-blue-100 text-blue-700', sales:'bg-green-100 text-green-700', pm:'bg-purple-100 text-purple-700', technician:'bg-orange-100 text-orange-700'};
+    tbody.innerHTML = data.users.map(u => `<tr class="border-t">
+      <td class="px-4 py-3 font-medium">${u.username}</td>
+      <td class="px-4 py-3">${u.full_name}</td>
+      <td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs ${rcolors[u.role]||''}">${u.role}</span></td>
+      <td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs ${u.is_active?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}">${u.is_active?'Active':'Inactive'}</span></td>
+    </tr>`).join('');
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function handleUserSubmit(e) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  try {
+    await api('/api/users', {method:'POST', body:Object.fromEntries(fd)});
+    closeModal('userModal'); toast('User created!', 'success'); loadUsers();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  if (await checkAuth()) showMainApp();
+});
+</script>
+</body>
 </html>
