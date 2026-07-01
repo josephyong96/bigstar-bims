@@ -41,6 +41,7 @@ body { font-family: 'Inter', sans-serif; background: #f3f4f6; }
 
 <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
 
+<!-- LOGIN PAGE -->
 <div id="loginPage" class="page active min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-blue-800 to-blue-600">
   <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md mx-4">
     <div class="text-center mb-8">
@@ -50,17 +51,28 @@ body { font-family: 'Inter', sans-serif; background: #f3f4f6; }
       <h1 class="text-2xl font-bold text-gray-800">Bigstar BIMS</h1>
       <p class="text-gray-500 text-sm mt-1">Inventory Management System</p>
     </div>
+
+    <!-- Debug info panel -->
+    <div id="debugPanel" class="mb-4 p-2 bg-gray-100 rounded text-xs font-mono hidden">
+      <p id="debugStatus">Checking backend...</p>
+    </div>
+
     <form id="loginForm" class="space-y-4">
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
-        <input type="text" id="loginUser" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none" placeholder="Enter username" required>
+        <input type="text" id="loginUser" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none" placeholder="Enter username" required value="admin">
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-        <input type="password" id="loginPass" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none" placeholder="Enter password" required>
+        <input type="password" id="loginPass" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none" placeholder="Enter password" required value="admin123">
       </div>
-      <button type="submit" class="w-full bg-primary text-white py-2.5 rounded-lg font-medium hover:bg-blue-800 transition flex items-center justify-center gap-2">
-        <i class="fas fa-sign-in-alt"></i> Sign In
+
+      <!-- Visible error message area -->
+      <div id="loginError" class="hidden p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm"></div>
+
+      <button type="submit" id="loginBtn" class="w-full bg-primary text-white py-2.5 rounded-lg font-medium hover:bg-blue-800 transition flex items-center justify-center gap-2">
+        <i class="fas fa-sign-in-alt" id="loginBtnIcon"></i>
+        <span id="loginBtnText">Sign In</span>
       </button>
     </form>
     <div class="mt-4 p-3 bg-blue-50 rounded-lg text-xs text-blue-700">
@@ -68,12 +80,11 @@ body { font-family: 'Inter', sans-serif; background: #f3f4f6; }
       <p>admin / admin123 (Management)</p>
       <p>warehouse / admin123</p>
       <p>sales / admin123</p>
-      <p>pm / admin123</p>
-      <p>tech / admin123</p>
     </div>
   </div>
 </div>
 
+<!-- MAIN APP -->
 <div id="mainApp" class="page">
   <div class="lg:hidden bg-primary text-white p-4 flex items-center justify-between">
     <button onclick="toggleSidebar()" class="text-white"><i class="fas fa-bars text-xl"></i></button>
@@ -461,6 +472,7 @@ body { font-family: 'Inter', sans-serif; background: #f3f4f6; }
   </div>
 </div>
 
+<!-- MODALS -->
 <div id="itemModal" class="modal fixed inset-0 bg-black/50 z-50 items-center justify-center p-4">
   <div class="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
     <div class="flex justify-between items-center mb-4">
@@ -630,30 +642,81 @@ body { font-family: 'Inter', sans-serif; background: #f3f4f6; }
 </div>
 
 <script>
+// ===== CONFIG =====
 const API_BASE = '';
 let authToken = localStorage.getItem('bims_token');
 let currentUser = null;
 let allItems = [];
 let allLocations = [];
 
+// ===== DEBUG LOGGING =====
+function dbg(msg, data) {
+  const line = '[BIMS] ' + msg + (data ? ': ' + JSON.stringify(data) : '');
+  console.log(line);
+  const debugPanel = document.getElementById('debugPanel');
+  const debugStatus = document.getElementById('debugStatus');
+  if (debugPanel && debugStatus) {
+    debugPanel.classList.remove('hidden');
+    debugStatus.textContent = line;
+  }
+}
+
+// ===== LOGIN =====
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
+  dbg('Login form submitted');
+
   const username = document.getElementById('loginUser').value;
   const password = document.getElementById('loginPass').value;
+  const loginBtn = document.getElementById('loginBtn');
+  const loginError = document.getElementById('loginError');
+
+  // Show loading state
+  loginBtn.disabled = true;
+  document.getElementById('loginBtnText').textContent = 'Signing in...';
+  loginError.classList.add('hidden');
+  loginError.textContent = '';
+
   try {
+    dbg('Sending login request', {username, url: `${API_BASE}/api/auth/login`});
     const res = await fetch(`${API_BASE}/api/auth/login`, {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({username, password})
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'Login failed');
+    dbg('Login response status', res.status);
+
+    let data;
+    try {
+      const text = await res.text();
+      dbg('Login response text', text.substring(0, 500));
+      data = text ? JSON.parse(text) : {};
+    } catch (parseErr) {
+      dbg('Failed to parse login response', parseErr.message);
+      throw new Error('Server returned invalid JSON. Check console.');
+    }
+
+    if (!res.ok) {
+      dbg('Login failed', data);
+      throw new Error(data.detail || 'Login failed (HTTP ' + res.status + ')');
+    }
+
+    dbg('Login success', {token: data.access_token ? 'present' : 'missing', user: data.user});
     authToken = data.access_token;
     currentUser = data.user;
     localStorage.setItem('bims_token', authToken);
-    showMainApp();
+
+    dbg('Calling showMainApp');
+    await showMainApp();
     toast('Login successful!', 'success');
   } catch (err) {
+    dbg('Login error', err.message);
+    loginError.textContent = err.message || 'An error occurred. Check browser console (F12).';
+    loginError.classList.remove('hidden');
     toast(err.message, 'error');
+  } finally {
+    loginBtn.disabled = false;
+    document.getElementById('loginBtnText').textContent = 'Sign In';
   }
 });
 
@@ -663,6 +726,7 @@ function logout() {
   document.getElementById('loginPage').classList.add('active');
   document.getElementById('mainApp').classList.remove('active');
   document.getElementById('loginForm').reset();
+  document.getElementById('loginError').classList.add('hidden');
 }
 
 async function checkAuth() {
@@ -683,9 +747,12 @@ function showPage(pageName) {
     l.classList.toggle('bg-blue-50', l.dataset.page === pageName);
     l.classList.toggle('text-primary', l.dataset.page === pageName);
   });
-  document.getElementById('pageTitle').textContent = pageName.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
-  document.getElementById('sidebar').classList.add('sidebar-hidden');
-  document.getElementById('sidebarOverlay').classList.add('hidden');
+  const titleEl = document.getElementById('pageTitle');
+  if (titleEl) titleEl.textContent = pageName.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  if (sidebar) sidebar.classList.add('sidebar-hidden');
+  if (overlay) overlay.classList.add('hidden');
 
   if (pageName === 'dashboard') loadDashboard();
   if (pageName === 'items') loadItems();
@@ -708,15 +775,44 @@ function toggleSidebar() {
 }
 
 async function showMainApp() {
-  document.getElementById('loginPage').classList.remove('active');
-  document.getElementById('mainApp').classList.add('active');
-  document.getElementById('userName').textContent = currentUser?.full_name || 'User';
-  document.getElementById('userRole').textContent = (currentUser?.role || '').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-  document.getElementById('userAvatar').textContent = (currentUser?.full_name || 'U')[0].toUpperCase();
-  document.getElementById('currentUser').textContent = currentUser?.full_name || '';
-  await loadLocationsData();
-  await loadItemsData();
-  showPage('dashboard');
+  dbg('showMainApp() starting');
+  try {
+    document.getElementById('loginPage').classList.remove('active');
+    document.getElementById('mainApp').classList.add('active');
+    dbg('Switched page visibility');
+
+    const u = currentUser || {};
+    const uNameEl = document.getElementById('userName');
+    const uRoleEl = document.getElementById('userRole');
+    const uAvatarEl = document.getElementById('userAvatar');
+    const uCurrentEl = document.getElementById('currentUser');
+
+    if (uNameEl) uNameEl.textContent = u.full_name || 'User';
+    if (uRoleEl) uRoleEl.textContent = (u.role || '').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+    if (uAvatarEl) uAvatarEl.textContent = (u.full_name || 'U')[0].toUpperCase();
+    if (uCurrentEl) uCurrentEl.textContent = u.full_name || '';
+    dbg('User info set', {name: u.full_name, role: u.role});
+
+    try { await loadLocationsData(); dbg('Locations loaded'); }
+    catch (e) { dbg('loadLocationsData error (non-fatal)', e.message); toast('Warning: Could not load locations: ' + e.message, 'warning'); }
+
+    try { await loadItemsData(); dbg('Items loaded'); }
+    catch (e) { dbg('loadItemsData error (non-fatal)', e.message); toast('Warning: Could not load items: ' + e.message, 'warning'); }
+
+    showPage('dashboard');
+    dbg('showMainApp() complete');
+  } catch (err) {
+    dbg('showMainApp() CRITICAL ERROR', err.message);
+    // If anything critical fails, ensure login page is shown
+    document.getElementById('loginPage').classList.add('active');
+    document.getElementById('mainApp').classList.remove('active');
+    const loginError = document.getElementById('loginError');
+    if (loginError) {
+      loginError.textContent = 'Failed to load app: ' + err.message;
+      loginError.classList.remove('hidden');
+    }
+    throw err;
+  }
 }
 
 async function api(url, opts = {}) {
@@ -726,7 +822,9 @@ async function api(url, opts = {}) {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(opts.body);
   }
-  const res = await fetch(API_BASE + url, opts);
+  const fullUrl = API_BASE + url;
+  dbg('API request', {url: fullUrl, method: opts.method || 'GET'});
+  const res = await fetch(fullUrl, opts);
   const text = await res.text();
   const data = text ? JSON.parse(text) : {};
   if (!res.ok) throw new Error(data.detail || `Error ${res.status}`);
@@ -744,28 +842,33 @@ function toast(message, type = 'info') {
 }
 
 function openModal(id) { document.getElementById(id).classList.add('active'); }
-function closeModal(id) { document.getElementById(id).classList.remove('active'); document.getElementById(id).querySelector('form')?.reset(); }
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('active');
+  const form = el ? el.querySelector('form') : null;
+  if (form) form.reset();
+}
 
 async function loadLocationsData() {
   const data = await api('/api/locations');
-  allLocations = data.locations;
+  allLocations = data.locations || [];
   const sel = document.getElementById('itemLocFilter');
-  sel.innerHTML = '<option value="">All Locations</option>' + allLocations.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+  if (sel) sel.innerHTML = '<option value="">All Locations</option>' + allLocations.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
 }
 
 async function loadItemsData() {
   const data = await api('/api/items?limit=1000');
-  allItems = data.items;
+  allItems = data.items || [];
 }
 
 function loadItemsSelect(id) {
   const sel = document.getElementById(id);
-  sel.innerHTML = '<option value="">Select Item</option>' + allItems.map(i => `<option value="${i.id}">${i.sku} - ${i.name}</option>`).join('');
+  if (sel) sel.innerHTML = '<option value="">Select Item</option>' + allItems.map(i => `<option value="${i.id}">${i.sku} - ${i.name}</option>`).join('');
 }
 
 function loadLocationsSelect(id) {
   const sel = document.getElementById(id);
-  sel.innerHTML = '<option value="">Select Location</option>' + allLocations.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+  if (sel) sel.innerHTML = '<option value="">Select Location</option>' + allLocations.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
 }
 
 async function loadDashboard() {
@@ -1127,8 +1230,21 @@ async function handleUserSubmit(e) {
   } catch (err) { toast(err.message, 'error'); }
 }
 
+// ===== INIT =====
 document.addEventListener('DOMContentLoaded', async () => {
-  if (await checkAuth()) showMainApp();
+  dbg('DOM loaded, checking auth');
+  // Quick backend connectivity test
+  try {
+    const pingRes = await fetch(`${API_BASE}/api/auth/login`, {method: 'OPTIONS'}).catch(() => null);
+    dbg('Backend connectivity test done');
+  } catch (e) { dbg('Backend connectivity test failed (non-critical)', e.message); }
+
+  if (await checkAuth()) {
+    dbg('Auto-login from stored token');
+    showMainApp();
+  } else {
+    dbg('No valid token, showing login');
+  }
 });
 </script>
 </body>
