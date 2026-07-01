@@ -1,203 +1,108 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { api } from "@/services/api";
-import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
-import { Plus, Trash2 } from "lucide-react";
-
-interface TransferLine {
-  item_id: string;
-  quantity: number;
-  from_location_id?: string;
-  to_location_id?: string;
-}
+import { Select } from "@/components/ui/select";
+import { stockApi, itemApi, locationApi } from "@/services/api";
+import type { Item, Location } from "@/types";
+import { Loader2, ArrowLeftRight } from "lucide-react";
 
 export default function TransferPage() {
-  const queryClient = useQueryClient();
-  const [referenceNo, setReferenceNo] = useState("");
-  const [lines, setLines] = useState<TransferLine[]>([
-    { item_id: "", quantity: 1 },
-  ]);
+  const [items, setItems] = useState<Item[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [itemId, setItemId] = useState("");
+  const [fromLocation, setFromLocation] = useState("");
+  const [toLocation, setToLocation] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [notes, setNotes] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
+  const navigate = useNavigate();
 
-  const { data: items, isLoading: itemsLoading } = useQuery({
-    queryKey: ["items"],
-    queryFn: () => api.get("/items"),
-  });
+  useEffect(() => {
+    async function load() {
+      const [i, l] = await Promise.all([itemApi.list({}), locationApi.list()]);
+      setItems(i.data.items || []);
+      setLocations(l.data || []);
+      setFetching(false);
+    }
+    load();
+  }, []);
 
-  const { data: locations } = useQuery({
-    queryKey: ["locations"],
-    queryFn: () => api.get("/locations"),
-  });
-
-  const transferMutation = useMutation({
-    mutationFn: (data: any) => api.post("/transfers", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["items"] });
-      setReferenceNo("");
-      setLines([{ item_id: "", quantity: 1 }]);
-    },
-  });
-
-  const addLine = () => {
-    setLines([...lines, { item_id: "", quantity: 1 }]);
-  };
-
-  const removeLine = (index: number) => {
-    setLines(lines.filter((_, i) => i !== index));
-  };
-
-  const updateLine = (index: number, field: keyof TransferLine, value: any) => {
-    const updated = [...lines];
-    updated[index] = { ...updated[index], [field]: value };
-    setLines(updated);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    transferMutation.mutate({
-      reference_no: referenceNo,
-      items: lines,
-    });
-  };
+    if (!itemId || !fromLocation || !toLocation || !quantity) return;
+    if (fromLocation === toLocation) { alert("Source and destination must be different"); return; }
+    setLoading(true);
+    try {
+      await stockApi.transfer({
+        item_id: itemId,
+        from_location_id: fromLocation,
+        to_location_id: toLocation,
+        quantity: parseInt(quantity),
+        notes: notes || undefined,
+      });
+      navigate("/items");
+    } catch (e: any) {
+      alert(e.response?.data?.detail || "Transfer failed");
+    }
+    setLoading(false);
+  }
 
-  if (itemsLoading) return <LoadingSpinner />;
+  if (fetching) return <div className="p-8 text-center">Loading...</div>;
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Stock Transfer</h1>
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Header</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 max-w-sm">
-              <Label htmlFor="reference">Reference No</Label>
-              <Input
-                id="reference"
-                value={referenceNo}
-                onChange={(e) => setReferenceNo(e.target.value)}
-                placeholder="e.g., TF-2024-001"
-              />
+    <div className="mx-auto max-w-2xl space-y-4">
+      <div className="flex items-center gap-3">
+        <ArrowLeftRight size={28} className="text-purple-600" />
+        <h2 className="text-2xl font-bold text-gray-800">Stock Transfer</h2>
+      </div>
+      <Card>
+        <CardContent className="p-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label>Item *</Label>
+              <Select value={itemId} onChange={(e) => setItemId(e.target.value)} required>
+                <option value="">Select item</option>
+                {items.map((i) => <option key={i.id} value={i.id}>{i.sku} - {i.name}</option>)}
+              </Select>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Items</CardTitle>
-            <Button type="button" variant="outline" size="sm" onClick={addLine}>
-              <Plus className="h-4 w-4 mr-1" />
-              Add Line
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {lines.map((line, index) => (
-              <div
-                key={index}
-                className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end p-4 border rounded-lg"
-              >
-                <div className="md:col-span-2 space-y-2">
-                  <Label>Item</Label>
-                  <Select
-                    value={line.item_id}
-                    onValueChange={(v) => updateLine(index, "item_id", v)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select item" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {items?.map((item: any) => (
-                        <SelectItem key={item.id} value={String(item.id)}>
-                          {item.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Qty</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={line.quantity}
-                    onChange={(e) =>
-                      updateLine(index, "quantity", parseInt(e.target.value))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>From</Label>
-                  <Select
-                    value={line.from_location_id}
-                    onValueChange={(v) => updateLine(index, "from_location_id", v)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {locations?.map((loc: any) => (
-                        <SelectItem key={loc.id} value={String(loc.id)}>
-                          {loc.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>To</Label>
-                  <Select
-                    value={line.to_location_id}
-                    onValueChange={(v) => updateLine(index, "to_location_id", v)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {locations?.map((loc: any) => (
-                        <SelectItem key={loc.id} value={String(loc.id)}>
-                          {loc.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  {lines.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeLine(index)}
-                    >
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
-                  )}
-                </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>From Location *</Label>
+                <Select value={fromLocation} onChange={(e) => setFromLocation(e.target.value)} required>
+                  <option value="">Select</option>
+                  {locations.filter((l) => l.is_active).map((l) => <option key={l.id} value={l.id}>{l.code}</option>)}
+                </Select>
               </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Button
-          type="submit"
-          disabled={transferMutation.isPending}
-          className="w-full md:w-auto"
-        >
-          {transferMutation.isPending ? "Submitting..." : "Submit Transfer"}
-        </Button>
-      </form>
+              <div>
+                <Label>To Location *</Label>
+                <Select value={toLocation} onChange={(e) => setToLocation(e.target.value)} required>
+                  <option value="">Select</option>
+                  {locations.filter((l) => l.is_active).map((l) => <option key={l.id} value={l.id}>{l.code}</option>)}
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>Quantity *</Label>
+              <Input type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} required />
+            </div>
+            <div>
+              <Label>Notes</Label>
+              <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <Button type="submit" disabled={loading} className="bg-purple-600 hover:bg-purple-700">
+                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Transfer
+              </Button>
+              <Button type="button" variant="outline" onClick={() => navigate("/items")}>Cancel</Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

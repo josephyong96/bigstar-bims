@@ -1,210 +1,131 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { api } from "@/services/api";
-import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
-import { Plus, Trash2 } from "lucide-react";
-
-interface StockInLine {
-  item_id: string;
-  quantity: number;
-  unit_price: number;
-  batch_number?: string;
-  location_id?: string;
-}
+import { Select } from "@/components/ui/select";
+import { stockApi, itemApi, locationApi } from "@/services/api";
+import type { Item, Location } from "@/types";
+import { Loader2, ArrowDownCircle } from "lucide-react";
 
 export default function StockInPage() {
-  const queryClient = useQueryClient();
-  const [referenceNo, setReferenceNo] = useState("");
-  const [remarks, setRemarks] = useState("");
-  const [lines, setLines] = useState<StockInLine[]>([
-    { item_id: "", quantity: 1, unit_price: 0 },
-  ]);
+  const [items, setItems] = useState<Item[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [itemId, setItemId] = useState("");
+  const [locationId, setLocationId] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [serialNumbers, setSerialNumbers] = useState("");
+  const [batchNumber, setBatchNumber] = useState("");
+  const [poRef, setPoRef] = useState("");
+  const [notes, setNotes] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
+  const navigate = useNavigate();
 
-  const { data: items, isLoading: itemsLoading } = useQuery({
-    queryKey: ["items"],
-    queryFn: () => api.get("/items"),
-  });
+  useEffect(() => {
+    async function load() {
+      const [i, l] = await Promise.all([itemApi.list({}), locationApi.list()]);
+      setItems(i.data.items || []);
+      setLocations(l.data || []);
+      setFetching(false);
+    }
+    load();
+  }, []);
 
-  const { data: locations } = useQuery({
-    queryKey: ["locations"],
-    queryFn: () => api.get("/locations"),
-  });
+  const selectedItem = items.find((i) => i.id === itemId);
 
-  const stockInMutation = useMutation({
-    mutationFn: (data: any) => api.post("/stock-in", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["items"] });
-      setReferenceNo("");
-      setRemarks("");
-      setLines([{ item_id: "", quantity: 1, unit_price: 0 }]);
-    },
-  });
-
-  const addLine = () => {
-    setLines([...lines, { item_id: "", quantity: 1, unit_price: 0 }]);
-  };
-
-  const removeLine = (index: number) => {
-    setLines(lines.filter((_, i) => i !== index));
-  };
-
-  const updateLine = (index: number, field: keyof StockInLine, value: any) => {
-    const updated = [...lines];
-    updated[index] = { ...updated[index], [field]: value };
-    setLines(updated);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    stockInMutation.mutate({
-      reference_no: referenceNo,
-      remarks,
-      items: lines,
-    });
-  };
+    if (!itemId || !locationId || !quantity) return;
+    setLoading(true);
+    try {
+      const payload: any = {
+        item_id: itemId,
+        to_location_id: locationId,
+        quantity: parseInt(quantity),
+        reference_number: poRef || undefined,
+        notes: notes || undefined,
+      };
+      if (serialNumbers.trim()) {
+        payload.serial_numbers = serialNumbers.split("\n").map((s) => s.trim()).filter(Boolean);
+      }
+      if (batchNumber.trim()) {
+        payload.batch_number = batchNumber.trim();
+      }
+      await stockApi.stockIn(payload);
+      navigate("/items");
+    } catch (e: any) {
+      alert(e.response?.data?.detail || "Stock in failed");
+    }
+    setLoading(false);
+  }
 
-  if (itemsLoading) return <LoadingSpinner />;
+  if (fetching) return <div className="p-8 text-center">Loading...</div>;
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Stock In</h1>
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Header</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="reference">Reference No</Label>
-              <Input
-                id="reference"
-                value={referenceNo}
-                onChange={(e) => setReferenceNo(e.target.value)}
-                placeholder="e.g., SI-2024-001"
-              />
+    <div className="mx-auto max-w-2xl space-y-4">
+      <div className="flex items-center gap-3">
+        <ArrowDownCircle size={28} className="text-green-600" />
+        <h2 className="text-2xl font-bold text-gray-800">Stock In (Goods Receive)</h2>
+      </div>
+      <Card>
+        <CardContent className="p-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label>Item *</Label>
+              <Select value={itemId} onChange={(e) => setItemId(e.target.value)} required>
+                <option value="">Select item</option>
+                {items.map((i) => <option key={i.id} value={i.id}>{i.sku} - {i.name}</option>)}
+              </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="remarks">Remarks</Label>
-              <Input
-                id="remarks"
-                value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
-                placeholder="Optional remarks"
-              />
+            <div>
+              <Label>Destination Location *</Label>
+              <Select value={locationId} onChange={(e) => setLocationId(e.target.value)} required>
+                <option value="">Select location</option>
+                {locations.filter((l) => l.is_active).map((l) => <option key={l.id} value={l.id}>{l.code} - {l.name}</option>)}
+              </Select>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Items</CardTitle>
-            <Button type="button" variant="outline" size="sm" onClick={addLine}>
-              <Plus className="h-4 w-4 mr-1" />
-              Add Line
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {lines.map((line, index) => (
-              <div
-                key={index}
-                className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end p-4 border rounded-lg"
-              >
-                <div className="md:col-span-2 space-y-2">
-                  <Label>Item</Label>
-                  <Select
-                    value={line.item_id}
-                    onValueChange={(v) => updateLine(index, "item_id", v)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select item" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {items?.map((item: any) => (
-                        <SelectItem key={item.id} value={String(item.id)}>
-                          {item.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Qty</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={line.quantity}
-                    onChange={(e) =>
-                      updateLine(index, "quantity", parseInt(e.target.value))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Unit Price</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={line.unit_price}
-                    onChange={(e) =>
-                      updateLine(index, "unit_price", parseFloat(e.target.value))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Location</Label>
-                  <Select
-                    value={line.location_id}
-                    onValueChange={(v) => updateLine(index, "location_id", v)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {locations?.map((loc: any) => (
-                        <SelectItem key={loc.id} value={String(loc.id)}>
-                          {loc.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  {lines.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeLine(index)}
-                    >
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
-                  )}
-                </div>
+            <div>
+              <Label>Quantity *</Label>
+              <Input type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} required />
+            </div>
+            {selectedItem?.tracking_type === "serial" || selectedItem?.tracking_type === "both" ? (
+              <div>
+                <Label>Serial Numbers (one per line)</Label>
+                <textarea
+                  className="flex min-h-[100px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  value={serialNumbers}
+                  onChange={(e) => setSerialNumbers(e.target.value)}
+                  placeholder="SN001&#10;SN002&#10;SN003"
+                />
+                <p className="text-xs text-gray-500 mt-1">{serialNumbers.split("\n").filter(Boolean).length} serial(s) entered</p>
               </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Button
-          type="submit"
-          disabled={stockInMutation.isPending}
-          className="w-full md:w-auto"
-        >
-          {stockInMutation.isPending ? "Submitting..." : "Submit Stock In"}
-        </Button>
-      </form>
+            ) : null}
+            {selectedItem?.tracking_type === "batch" || selectedItem?.tracking_type === "both" ? (
+              <div>
+                <Label>Batch Number</Label>
+                <Input value={batchNumber} onChange={(e) => setBatchNumber(e.target.value)} placeholder="BATCH-2024-001" />
+              </div>
+            ) : null}
+            <div>
+              <Label>PO Reference</Label>
+              <Input value={poRef} onChange={(e) => setPoRef(e.target.value)} placeholder="PO-2024-001" />
+            </div>
+            <div>
+              <Label>Notes</Label>
+              <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes" />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <Button type="submit" disabled={loading} className="bg-green-600 hover:bg-green-700">
+                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Receive Stock
+              </Button>
+              <Button type="button" variant="outline" onClick={() => navigate("/items")}>Cancel</Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
