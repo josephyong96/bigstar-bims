@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: bims-db
+    environment:
+      POSTGRES_DB: bigstar_inventory
+      POSTGRES_USER: bigstar
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-bigstar123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - bims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bigstar -d bigstar_inventory"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: bims-backend
+    environment:
+      DATABASE_URL: postgresql://bigstar:${DB_PASSWORD:-bigstar123}@db:5432/bigstar_inventory
+      SECRET_KEY: ${SECRET_KEY:-bigstar-secret-key-change-in-production}
+      ALLOWED_ORIGINS: "*"
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - "8000:8000"
+    networks:
+      - bims-network
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    command: >
+      sh -c "cd /app/app && python init_data.py && cd /app && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  frontend:
+    build: ./frontend
+    container_name: bims-frontend
+    ports:
+      - "80:80"
+    networks:
+      - bims-network
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  bims-network:
+    driver: bridge
