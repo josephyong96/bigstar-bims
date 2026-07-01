@@ -12,6 +12,7 @@ from fastapi import FastAPI, HTTPException, status, Depends, Query, Request, Bod
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, ForeignKey, Date, Boolean, event
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
@@ -504,15 +505,17 @@ def hash_password(password: str) -> str:
     return hashlib.pbkdf2_hmac("sha256", password.encode(), SECRET_KEY.encode(), 100000).hex()
 
 def create_token(user_id: int) -> str:
+    now = datetime.datetime.utcnow()
+    exp = now + datetime.timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {
         "sub": str(user_id),
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
-        "iat": datetime.datetime.utcnow(),
+        "exp": exp.isoformat(),
+        "iat": now.isoformat(),
         "jti": secrets.token_hex(16)
     }
     import base64
     header_b64 = base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode()).decode().rstrip("=")
-    payload_b64 = base64.urlsafe_b64encode(json.dumps(payload, default=str).encode()).decode().rstrip("=")
+    payload_b64 = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip("=")
     sig = hashlib.sha256(f"{header_b64}.{payload_b64}.{SECRET_KEY}".encode()).hexdigest()
     return f"{header_b64}.{payload_b64}.{sig}"
 
@@ -526,7 +529,10 @@ def verify_token(token: str) -> Optional[int]:
         sig_check = hashlib.sha256(f"{parts[0]}.{parts[1]}.{SECRET_KEY}".encode()).hexdigest()
         if sig_check != parts[2]:
             return None
-        exp = datetime.datetime.fromisoformat(str(payload["exp"]).replace("Z", "+00:00").replace("+00:00", ""))
+        exp_str = str(payload.get("exp", ""))
+        # Handle both ISO format and legacy formats
+        exp_str = exp_str.replace("Z", "+00:00").replace("+00:00", "")
+        exp = datetime.datetime.fromisoformat(exp_str)
         if datetime.datetime.utcnow() > exp:
             return None
         return int(payload["sub"])
@@ -561,6 +567,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="BIMS API", version="2.0.0", lifespan=lifespan)
 
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Serve frontend static files
 frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend")
 if os.path.exists(frontend_dir):
@@ -571,12 +586,14 @@ if os.path.exists(frontend_dir):
 @app.post("/api/auth/login", response_model=TokenResponse)
 def login(req: LoginRequest):
     db = SessionLocal()
-    user = db.query(User).filter(User.username == req.username).first()
-    db.close()
-    if not user or hash_password(req.password) != user.password_hash:
-        raise HTTPException(status_code=401, detail="Invalid username or password")
-    token = create_token(user.id)
-    return {"access_token": token, "token_type": "bearer", "user": user}
+    try:
+        user = db.query(User).filter(User.username == req.username).first()
+        if not user or hash_password(req.password) != user.password_hash:
+            raise HTTPException(status_code=401, detail="Invalid username or password")
+        token = create_token(user.id)
+        return {"access_token": token, "token_type": "bearer", "user": user}
+    finally:
+        db.close()
 
 @app.get("/api/auth/me", response_model=UserResponse)
 def get_me(user: User = Depends(get_current_user)):
